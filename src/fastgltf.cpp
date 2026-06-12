@@ -29,6 +29,7 @@
 #error "fastgltf requires C++17"
 #endif
 
+#include <cmath>
 #include <fstream>
 #include <functional>
 #include <mutex>
@@ -4602,7 +4603,7 @@ fg::Error fg::Parser::parsePhysicsRigidBody(simdjson::dom::object& khr_physics_r
 		}
 
 		dom::array inertialOrientationArray;
-		if (error = motionObject["inertialOrientation"].get_array().get(inertialOrientationArray); error == SUCCESS) {
+		if (error = motionObject["inertiaOrientation"].get_array().get(inertialOrientationArray); error == SUCCESS) {
 			if (inertialOrientationArray.size() != 4) FASTGLTF_UNLIKELY {
 				return Error::InvalidGltf;
 			}
@@ -4693,6 +4694,12 @@ fg::Error fg::Parser::parsePhysicsRigidBody(simdjson::dom::object& khr_physics_r
 			} else if (error != NO_SUCH_FIELD) FASTGLTF_UNLIKELY {
 				return Error::InvalidGltf;
 			}
+			std::uint64_t geometryMesh;
+			if (error = geometryObject["mesh"].get_uint64().get(geometryMesh); error == SUCCESS) {
+				collider.geometry.mesh = static_cast<std::size_t>(geometryMesh);
+			} else if (error != NO_SUCH_FIELD) FASTGLTF_UNLIKELY {
+				return Error::InvalidGltf;
+			}
 			bool convexHull;
 			if (error = geometryObject["convexHull"].get_bool().get(convexHull); error == SUCCESS) {
 				collider.geometry.convexHull = convexHull;
@@ -4736,6 +4743,12 @@ fg::Error fg::Parser::parsePhysicsRigidBody(simdjson::dom::object& khr_physics_r
 			std::uint64_t geometryNode;
 			if (error = geometryObject["node"].get_uint64().get(geometryNode); error == SUCCESS) {
 				geometryTrigger.geometry.node = static_cast<std::size_t>(geometryNode);
+			} else if (error != NO_SUCH_FIELD) FASTGLTF_UNLIKELY {
+				return Error::InvalidGltf;
+			}
+			std::uint64_t geometryMesh;
+			if (error = geometryObject["mesh"].get_uint64().get(geometryMesh); error == SUCCESS) {
+				geometryTrigger.geometry.mesh = static_cast<std::size_t>(geometryMesh);
 			} else if (error != NO_SUCH_FIELD) FASTGLTF_UNLIKELY {
 				return Error::InvalidGltf;
 			}
@@ -6279,23 +6292,23 @@ void fg::Exporter::writeNodes(const Asset& asset, std::string& json) {
 #if FASTGLTF_ENABLE_KHR_PHYSICS_RIGID_BODIES
 			if (it->physicsRigidBody) {
 				if (json.back() != '{') json += ',';
-				json += R"("KHR_physics_rigid_body":{)";
+				json += R"("KHR_physics_rigid_bodies":{)";
 				if (it->physicsRigidBody->motion.has_value()) {
 					const auto& motion = *it->physicsRigidBody->motion;
-					json += R"("motion":{"isKinematic":)" + std::to_string(motion.isKinematic);
+					json += R"("motion":{"isKinematic":)" + std::string(motion.isKinematic ? "true" : "false");
 					if (motion.mass.has_value()) {
 						json += R"(,"mass":)" + to_string_fp(*motion.mass);
 					}
 					json += R"(,"centerOfMass":[)" + to_string(motion.centerOfMass) + ']';
 					if (motion.inertialDiagonal.has_value()) {
-						json += R"(,"inertialDiagonal":[)" + to_string(*motion.inertialDiagonal) + ']';
+						json += R"(,"inertiaDiagonal":[)" + to_string(*motion.inertialDiagonal) + ']';
 					}
 					if (motion.inertialOrientation.has_value()) {
-						json += R"(,"inertialOrientation":[)" + to_string(*motion.inertialOrientation) + ']';
+						json += R"(,"inertiaOrientation":[)" + to_string(*motion.inertialOrientation) + ']';
 					}
-					json += R"(,"linearVelocity":)" + to_string(motion.linearVelocity)
+					json += R"(,"linearVelocity":[)" + to_string(motion.linearVelocity)
 				        + R"(],"angularVelocity":[)" + to_string(motion.angularVelocity)
-				        + R"(],"gravityFactor":[)" + to_string_fp(motion.gravityFactor) + '}';
+				        + R"(],"gravityFactor":)" + to_string_fp(motion.gravityFactor) + '}';
 				}
 
 				if (it->physicsRigidBody->trigger.has_value()) {
@@ -6306,11 +6319,16 @@ void fg::Exporter::writeNodes(const Asset& asset, std::string& json) {
 						[&](const GeometryTrigger& geometry) {
 							json += R"("geometry":{)";
 							if (geometry.geometry.shape.has_value()) {
-								json += R"("shape":)" + std::to_string(*geometry.geometry.shape) + ',';
-							} else if(geometry.geometry.node.has_value()) {
-								json += R"("node":)" + std::to_string(*geometry.geometry.node) + ',';
+								json += R"("shape":)" + std::to_string(*geometry.geometry.shape);
+							} else if (geometry.geometry.mesh.has_value()) {
+								json += R"("mesh":)" + std::to_string(*geometry.geometry.mesh);
+							} else if (geometry.geometry.node.has_value()) {
+								json += R"("node":)" + std::to_string(*geometry.geometry.node);
 							}
-							json += R"("convexHull":)" + std::to_string(geometry.geometry.convexHull) + '}';
+							if (geometry.geometry.convexHull) {
+								json += R"(,"convexHull":true)";
+							}
+							json += '}';
 
 							if (geometry.collisionFilter.has_value()) {
 								json += R"(,"collisionFilter":)" + std::to_string(*geometry.collisionFilter);
@@ -6334,7 +6352,7 @@ void fg::Exporter::writeNodes(const Asset& asset, std::string& json) {
 					const auto& joint = *it->physicsRigidBody->joint;
 					json += R"("joint":{"connectedNode":)" + std::to_string(joint.connectedNode)
 				        + R"(,"joint":)" + std::to_string(joint.joint)
-				        + R"(,"enableCollision":)" + std::to_string(joint.enableCollision) + '}';
+				        + R"(,"enableCollision":)" + std::string(joint.enableCollision ? "true" : "false") + '}';
 				}
 
 				if (it->physicsRigidBody->collider.has_value()) {
@@ -6344,11 +6362,16 @@ void fg::Exporter::writeNodes(const Asset& asset, std::string& json) {
 
 					json += R"("geometry":{)";
 					if (collider.geometry.shape.has_value()) {
-						json += R"("shape":)" + std::to_string(*collider.geometry.shape) + ',';
+						json += R"("shape":)" + std::to_string(*collider.geometry.shape);
+					} else if (collider.geometry.mesh.has_value()) {
+						json += R"("mesh":)" + std::to_string(*collider.geometry.mesh);
 					} else if (collider.geometry.node.has_value()) {
-						json += R"("node":)" + std::to_string(*collider.geometry.node) + ',';
+						json += R"("node":)" + std::to_string(*collider.geometry.node);
 					}
-					json += R"("convexHull":)" + std::to_string(collider.geometry.convexHull) + '}';
+					if (collider.geometry.convexHull) {
+						json += R"(,"convexHull":true)";
+					}
+					json += '}';
 
 					if (collider.physicsMaterial.has_value()) {
 						json += R"(,"physicsMaterial":)" + std::to_string(*collider.physicsMaterial);
@@ -6358,6 +6381,7 @@ void fg::Exporter::writeNodes(const Asset& asset, std::string& json) {
 					}
 					json += '}';
 				}
+				json += '}';
 			}
 #endif
 
@@ -6735,11 +6759,11 @@ void fg::Exporter::writeCollisionFilters(const Asset& asset, std::string& json) 
 			}
 			json += ']';
 		}
-		if (json.back() == ']') {
-			json += ',';
-		}
 
 		if (!filter.collideWithSystems.empty()) {
+			if (json.back() == ']') {
+				json += ',';
+			}
 			json += R"("collideWithSystems":[)";
 			for (auto systemIt = filter.collideWithSystems.begin(); systemIt != filter.collideWithSystems.end(); ++systemIt) {
 				json += '"';
@@ -6752,11 +6776,11 @@ void fg::Exporter::writeCollisionFilters(const Asset& asset, std::string& json) 
 			}
 			json += ']';
 		}
-		if (json.back() == ']') {
-			json += ',';
-		}
 
 		if (!filter.notCollideWithSystems.empty()) {
+			if (json.back() == ']') {
+				json += ',';
+			}
 			json += R"("notCollideWithSystems":[)";
 			for (auto systemIt = filter.notCollideWithSystems.begin(); systemIt != filter.notCollideWithSystems.end(); ++systemIt) {
 				json += '"';
@@ -6881,9 +6905,11 @@ void fg::Exporter::writePhysicsJoints(const Asset& asset, std::string& json) {
 					break;
 				}
 
-				json += R"(,"axis":)" + std::to_string(drive.axis)
-			        + R"(,"maxForce":)" + to_string_fp(drive.maxForce)
-			        + R"(,"positionTarget":)" + to_string_fp(drive.positionTarget)
+				json += R"(,"axis":)" + std::to_string(drive.axis);
+				if (std::isfinite(drive.maxForce)) {
+					json += R"(,"maxForce":)" + to_string_fp(drive.maxForce);
+				}
+				json += R"(,"positionTarget":)" + to_string_fp(drive.positionTarget)
 			        + R"(,"velocityTarget":)" + to_string_fp(drive.velocityTarget)
 			        + R"(,"stiffness":)" + to_string_fp(drive.stiffness)
 			        + R"(,"damping":)" + to_string_fp(drive.damping);
