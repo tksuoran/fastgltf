@@ -308,6 +308,15 @@ namespace fastgltf {
 		 * loading process.
 		 */
 		GenerateMeshIndices             = 1 << 8,
+
+		/**
+		 * Loads all external files from the glTF 2.1 "files" array into CPU memory, mirroring
+		 * LoadExternalBuffers and LoadExternalImages. If disabled, fastgltf will only provide
+		 * the URI of each file. Note that fastgltf never recursively parses glTF assets
+		 * referenced through "externalAssets", and does not detect reference cycles across
+		 * files; both are the application's responsibility.
+		 */
+		LoadExternalFiles               = 1 << 9,
     };
 
     FASTGLTF_EXPORT enum class ExportOptions : std::uint64_t {
@@ -857,6 +866,8 @@ namespace fastgltf {
 		Error parseBufferViews(const simdjson::dom::array& array, Asset& asset);
 		Error parseCameras(simdjson::dom::array& array, Asset& asset);
 		Error parseExtensions(const simdjson::dom::object& extensionsObject, Asset& asset);
+		Error parseExternalAssets(const simdjson::dom::array& array, Asset& asset);
+		Error parseFiles(simdjson::dom::array& array, Asset& asset);
 		Error parseImages(simdjson::dom::array& array, Asset& asset);
 		Error parseLights(const simdjson::dom::array& array, Asset& asset);
 		Error parseMaterialExtensions(simdjson::dom::object& object, Material& material);
@@ -963,6 +974,7 @@ namespace fastgltf {
 
         std::vector<std::optional<std::filesystem::path>> bufferPaths;
         std::vector<std::optional<std::filesystem::path>> imagePaths;
+        std::vector<std::optional<std::filesystem::path>> filePaths;
     };
 
     /**
@@ -980,18 +992,22 @@ namespace fastgltf {
 
         std::filesystem::path bufferFolder = "";
         std::filesystem::path imageFolder = "";
+        std::filesystem::path fileFolder = "";
 
 		void* userPointer = nullptr;
 		ExtrasWriteCallback* extrasWriteCallback = nullptr;
 
         std::vector<std::optional<std::filesystem::path>> bufferPaths;
         std::vector<std::optional<std::filesystem::path>> imagePaths;
+        std::vector<std::optional<std::filesystem::path>> filePaths;
 
         void writeAccessors(const Asset& asset, std::string& json);
         void writeAnimations(const Asset& asset, std::string& json);
         void writeBuffers(const Asset& asset, std::string& json);
         void writeBufferViews(const Asset& asset, std::string& json);
         void writeCameras(const Asset& asset, std::string& json);
+        void writeExternalAssets(const Asset& asset, std::string& json);
+        void writeFiles(const Asset& asset, std::string& json);
         void writeImages(const Asset& asset, std::string& json);
         void writeLights(const Asset& asset, std::string& json);
         void writeMaterials(const Asset& asset, std::string& json);
@@ -1013,6 +1029,7 @@ namespace fastgltf {
 
         std::filesystem::path getBufferFilePath(const Asset& asset, std::size_t index);
         std::filesystem::path getImageFilePath(const Asset& asset, std::size_t index, MimeType mimeType);
+        std::filesystem::path getFileFilePath(const Asset& asset, std::size_t index);
 
         std::string writeJson(const Asset& asset);
 
@@ -1029,6 +1046,12 @@ namespace fastgltf {
          * If folder.is_relative() returns false, this has no effect.
          */
         void setImagePath(std::filesystem::path folder);
+        /**
+         * Sets the relative base path for URIs of glTF 2.1 "files" array entries.
+         *
+         * If folder.is_relative() returns false, this has no effect.
+         */
+        void setFilePath(std::filesystem::path folder);
 
 		void setExtrasWriteCallback(ExtrasWriteCallback* callback) noexcept;
 

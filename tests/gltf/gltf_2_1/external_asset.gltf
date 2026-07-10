@@ -1,0 +1,34 @@
+{
+    "asset": {
+        "version": "2.1",
+        "minVersion": "2.1"
+    },
+    "files": [
+        {
+            "mimeType": "model/gltf+json",
+            "uri": "sub_model.gltf"
+        }
+    ],
+    "externalAssets": [
+        {
+            "name": "sub_model",
+            "file": 0
+        }
+    ],
+    "nodes": [
+        {
+            "name": "RootNode",
+            "children": [1]
+        },
+        {
+            "name": "SubModel",
+            "externalAsset": 0
+        }
+    ],
+    "scene": 0,
+    "scenes": [
+        {
+            "nodes": [0]
+        }
+    ]
+}

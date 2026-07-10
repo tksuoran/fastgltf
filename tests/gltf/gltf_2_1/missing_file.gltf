@@ -1,0 +1,11 @@
+{
+    "asset": {
+        "version": "2.1"
+    },
+    "files": [
+        {
+            "mimeType": "application/octet-stream",
+            "uri": "does_not_exist.bin"
+        }
+    ]
+}
