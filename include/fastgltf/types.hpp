@@ -209,6 +209,8 @@ namespace fastgltf {
         GltfBuffer = 5,
         OctetStream = 6,
         WEBP = 7,
+        GltfJson = 8,
+        GltfBinary = 9,
     };
 
     FASTGLTF_EXPORT enum class AnimationInterpolation : std::uint8_t {
@@ -298,6 +300,9 @@ namespace fastgltf {
 		CollisionFilters	= 1 << 16,
 		PhysicsJoints		= 1 << 17,
 #endif
+
+		Files          = 1 << 18,
+		ExternalAssets = 1 << 19,
 
 		All = ~0u,
 
@@ -498,6 +503,8 @@ namespace fastgltf {
 	constexpr std::string_view mimeTypeGltfBuffer = "application/gltf-buffer";
 	constexpr std::string_view mimeTypeOctetStream = "application/octet-stream";
 	constexpr std::string_view mimeTypeWebp = "image/webp";
+	constexpr std::string_view mimeTypeGltfJson = "model/gltf+json";
+	constexpr std::string_view mimeTypeGltfBinary = "model/gltf-binary";
 
 	constexpr std::string_view getMimeTypeString(MimeType mimeType) noexcept {
 		switch (mimeType) {
@@ -515,6 +522,10 @@ namespace fastgltf {
 				return mimeTypeOctetStream;
 			case MimeType::WEBP:
 				return mimeTypeWebp;
+			case MimeType::GltfJson:
+				return mimeTypeGltfJson;
+			case MimeType::GltfBinary:
+				return mimeTypeGltfBinary;
 			default:
 				return "";
 		}
@@ -1923,6 +1934,11 @@ namespace fastgltf {
 
     FASTGLTF_EXPORT struct AssetInfo {
         FASTGLTF_STD_PMR_NS::string gltfVersion;
+        /**
+         * The minimum glTF version that a loader needs to support to properly load this asset,
+         * stored verbatim. Empty when the asset does not declare one.
+         */
+        FASTGLTF_STD_PMR_NS::string minVersion;
         FASTGLTF_STD_PMR_NS::string copyright;
         FASTGLTF_STD_PMR_NS::string generator;
     };
@@ -2254,6 +2270,12 @@ namespace fastgltf {
          * Only ever non-empty when KHR_lights_punctual is enabled and used by the asset.
          */
         Optional<std::size_t> lightIndex;
+
+        /**
+         * Index into Asset::externalAssets. When set, this node instantiates the referenced
+         * external glTF asset at this point in the scene hierarchy (glTF 2.1).
+         */
+        Optional<std::size_t> externalAssetIndex;
 
 	    FASTGLTF_FG_PMR_NS::MaybeSmallVector<std::size_t> children;
 	    FASTGLTF_FG_PMR_NS::MaybeSmallVector<num> weights;
@@ -2666,6 +2688,37 @@ namespace fastgltf {
         FASTGLTF_STD_PMR_NS::string name;
     };
 
+    /**
+     * An entry of the top-level "files" array introduced with glTF 2.1, which unifies how
+     * external, embedded, and packaged resources of any type are referenced.
+     */
+    FASTGLTF_EXPORT struct File {
+        DataSource data;
+
+        /**
+         * The MIME type declared in the asset, stored verbatim. Unlike buffers and images this
+         * is required, and may be any MIME type, which is why this is not a MimeType enum value.
+         */
+        FASTGLTF_STD_PMR_NS::string mimeType;
+
+        FASTGLTF_STD_PMR_NS::string name;
+    };
+
+    /**
+     * An entry of the top-level "externalAssets" array introduced with glTF 2.1. References a
+     * glTF asset through the Asset::files array, which nodes can instantiate through
+     * Node::externalAssetIndex. fastgltf does not load or parse the referenced asset itself,
+     * and does not detect cross-file reference cycles; both are the application's responsibility.
+     */
+    FASTGLTF_EXPORT struct ExternalAsset {
+        /**
+         * Index into Asset::files, pointing at the referenced glTF file.
+         */
+        std::size_t fileIndex;
+
+        FASTGLTF_STD_PMR_NS::string name;
+    };
+
     FASTGLTF_EXPORT struct SparseAccessor {
         std::size_t count;
         std::size_t indicesBufferView;
@@ -2816,6 +2869,8 @@ namespace fastgltf {
         std::vector<Buffer> buffers;
         std::vector<BufferView> bufferViews;
         std::vector<Camera> cameras;
+        std::vector<ExternalAsset> externalAssets;
+        std::vector<File> files;
         std::vector<Image> images;
         std::vector<Light> lights;
         std::vector<Material> materials;
@@ -2856,6 +2911,8 @@ namespace fastgltf {
 				buffers(std::move(other.buffers)),
 				bufferViews(std::move(other.bufferViews)),
 				cameras(std::move(other.cameras)),
+				externalAssets(std::move(other.externalAssets)),
+				files(std::move(other.files)),
 				images(std::move(other.images)),
 				lights(std::move(other.lights)),
 				materials(std::move(other.materials)),
@@ -2887,6 +2944,8 @@ namespace fastgltf {
 			buffers = std::move(other.buffers);
 			bufferViews = std::move(other.bufferViews);
 			cameras = std::move(other.cameras);
+			externalAssets = std::move(other.externalAssets);
+			files = std::move(other.files);
 			images = std::move(other.images);
 			lights = std::move(other.lights);
 			materials = std::move(other.materials);
