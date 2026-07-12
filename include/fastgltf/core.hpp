@@ -581,6 +581,34 @@ namespace fastgltf {
 	FASTGLTF_EXPORT using ExtrasWriteCallback = std::optional<std::string>(std::size_t objectIndex, Category objectType, void* userPointer);
 
 	/**
+	 * subObjectIndex value passed to the generic extensions callbacks for every object that is not
+	 * a mesh primitive. For mesh primitives (Category::Meshes) subObjectIndex is the primitive
+	 * index within the mesh while objectIndex is the mesh index; a Category::Meshes invocation
+	 * with invalidSubObjectIndex refers to the mesh object itself.
+	 */
+	FASTGLTF_EXPORT inline constexpr std::size_t invalidSubObjectIndex = ~static_cast<std::size_t>(0);
+
+	/**
+	 * Generic extension passthrough, read side: invoked once per parsed object that has an
+	 * "extensions" member, with the whole extensions object. The application picks the extension
+	 * names it understands (e.g. its own vendor extensions) and ignores the rest; fastgltf stays
+	 * schema-agnostic. Fired for: the asset root (Category::Asset, objectIndex 0), scenes, nodes,
+	 * cameras, materials, meshes, and mesh primitives (see invalidSubObjectIndex). Like
+	 * ExtrasParseCallback, objectIndex is the index the object will have once parsed.
+	 */
+	FASTGLTF_EXPORT using ExtensionsParseCallback = void(simdjson::dom::object* extensions, std::size_t objectIndex, std::size_t subObjectIndex, Category objectType, void* userPointer);
+
+	/**
+	 * Generic extension passthrough, write side: invoked once per written object; the returned
+	 * string is spliced verbatim into the object's "extensions" object as one or more members,
+	 * e.g. R"("VENDOR_ext":{"value":1})" (multiple members comma-separated, NO surrounding
+	 * braces). Return std::nullopt (or an empty string) to write nothing. The application is
+	 * responsible for adding the extension names it writes to Asset::extensionsUsed. Fired for
+	 * the same object types as ExtensionsParseCallback.
+	 */
+	FASTGLTF_EXPORT using ExtensionsWriteCallback = std::optional<std::string>(std::size_t objectIndex, std::size_t subObjectIndex, Category objectType, void* userPointer);
+
+	/**
 	 * This interface defines how the parser can read the bytes making up a glTF or GLB file.
 	 */
 	FASTGLTF_EXPORT class GltfDataGetter {
@@ -822,6 +850,7 @@ namespace fastgltf {
         BufferUnmapCallback* unmapCallback = nullptr;
         Base64DecodeCallback* decodeCallback = nullptr;
 		ExtrasParseCallback* extrasCallback = nullptr;
+		ExtensionsParseCallback* extensionsCallback = nullptr;
 
         void* userPointer = nullptr;
         Extensions extensions = Extensions::None;
@@ -955,6 +984,8 @@ namespace fastgltf {
 
 		void setExtrasParseCallback(ExtrasParseCallback* extrasCallback) noexcept;
 
+		void setExtensionsParseCallback(ExtensionsParseCallback* extensionsCallback) noexcept;
+
         void setUserPointer(void* pointer) noexcept;
     };
 
@@ -996,6 +1027,7 @@ namespace fastgltf {
 
 		void* userPointer = nullptr;
 		ExtrasWriteCallback* extrasWriteCallback = nullptr;
+		ExtensionsWriteCallback* extensionsWriteCallback = nullptr;
 
         std::vector<std::optional<std::filesystem::path>> bufferPaths;
         std::vector<std::optional<std::filesystem::path>> imagePaths;
@@ -1054,6 +1086,8 @@ namespace fastgltf {
         void setFilePath(std::filesystem::path folder);
 
 		void setExtrasWriteCallback(ExtrasWriteCallback* callback) noexcept;
+
+		void setExtensionsWriteCallback(ExtensionsWriteCallback* callback) noexcept;
 
 		void setUserPointer(void* pointer) noexcept;
 

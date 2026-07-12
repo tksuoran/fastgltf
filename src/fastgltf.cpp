@@ -2349,6 +2349,13 @@ fg::Error fg::Parser::parseCameras(simdjson::dom::array& cameras, Asset& asset) 
             return Error::InvalidGltf;
         }
 
+		if (config.extensionsCallback != nullptr) {
+			dom::object extensionsObject;
+			if (cameraObject["extensions"].get_object().get(extensionsObject) == SUCCESS) {
+				config.extensionsCallback(&extensionsObject, asset.cameras.size(), invalidSubObjectIndex, Category::Cameras, config.userPointer);
+			}
+		}
+
 		if (config.extrasCallback != nullptr) {
 			dom::object extrasObject;
 			if (auto extrasError = cameraObject["extras"].get_object().get(extrasObject); extrasError == SUCCESS) {
@@ -2366,6 +2373,11 @@ fg::Error fg::Parser::parseCameras(simdjson::dom::array& cameras, Asset& asset) 
 
 fg::Error fg::Parser::parseExtensions(const simdjson::dom::object& extensionsObject, Asset& asset) {
     using namespace simdjson;
+
+    if (config.extensionsCallback != nullptr) {
+        dom::object mutableExtensionsObject = extensionsObject;
+        config.extensionsCallback(&mutableExtensionsObject, 0, invalidSubObjectIndex, Category::Asset, config.userPointer);
+    }
 
     for (auto extensionValue : extensionsObject) {
         dom::object extensionObject;
@@ -3543,6 +3555,13 @@ fg::Error fg::Parser::parseMaterials(simdjson::dom::array& materials, Asset& ass
             return Error::InvalidJson;
         }
 
+		if (config.extensionsCallback != nullptr) {
+			dom::object genericExtensionsObject;
+			if (materialObject["extensions"].get_object().get(genericExtensionsObject) == SUCCESS) {
+				config.extensionsCallback(&genericExtensionsObject, asset.materials.size(), invalidSubObjectIndex, Category::Materials, config.userPointer);
+			}
+		}
+
 		if (config.extrasCallback != nullptr) {
 			dom::object extrasObject;
 			if (auto extrasError = materialObject["extras"].get_object().get(extrasObject); extrasError == SUCCESS) {
@@ -3719,6 +3738,13 @@ fg::Error fg::Parser::parseMeshes(simdjson::dom::array& meshes, Asset& asset) {
 				}
 			}
 
+			if (config.extensionsCallback != nullptr) {
+				dom::object genericExtensionsObject;
+				if (primitiveObject["extensions"].get_object().get(genericExtensionsObject) == SUCCESS) {
+					config.extensionsCallback(&genericExtensionsObject, asset.meshes.size(), mesh.primitives.size(), Category::Meshes, config.userPointer);
+				}
+			}
+
 			mesh.primitives.emplace_back(std::move(primitive));
 		}
 
@@ -3735,6 +3761,13 @@ fg::Error fg::Parser::parseMeshes(simdjson::dom::array& meshes, Asset& asset) {
         } else if (meshError != Error::MissingField && meshError != Error::None) {
             return Error::InvalidGltf;
         }
+
+		if (config.extensionsCallback != nullptr) {
+			dom::object genericExtensionsObject;
+			if (meshObject["extensions"].get_object().get(genericExtensionsObject) == SUCCESS) {
+				config.extensionsCallback(&genericExtensionsObject, asset.meshes.size(), invalidSubObjectIndex, Category::Meshes, config.userPointer);
+			}
+		}
 
 		if (config.extrasCallback != nullptr) {
 			dom::object extrasObject;
@@ -3987,6 +4020,13 @@ fg::Error fg::Parser::parseNodes(simdjson::dom::array& nodes, Asset& asset) {
         	}
         }
 
+		if (config.extensionsCallback != nullptr) {
+			dom::object genericExtensionsObject;
+			if (nodeObject["extensions"].get_object().get(genericExtensionsObject) == SUCCESS) {
+				config.extensionsCallback(&genericExtensionsObject, asset.nodes.size(), invalidSubObjectIndex, Category::Nodes, config.userPointer);
+			}
+		}
+
 		if (config.extrasCallback != nullptr) {
 			dom::object extrasObject;
 			if (auto extrasError = nodeObject["extras"].get_object().get(extrasObject); extrasError == SUCCESS) {
@@ -4077,6 +4117,13 @@ fg::Error fg::Parser::parseScenes(const simdjson::dom::array& scenes, Asset& ass
         if (sceneObject["name"].get_string().get(name) == SUCCESS) {
 	        scene.name = FASTGLTF_CONSTRUCT_PMR_RESOURCE(decltype(scene.name), resourceAllocator.get(), name);
         }
+
+		if (config.extensionsCallback != nullptr) {
+			dom::object genericExtensionsObject;
+			if (sceneObject["extensions"].get_object().get(genericExtensionsObject) == SUCCESS) {
+				config.extensionsCallback(&genericExtensionsObject, asset.scenes.size(), invalidSubObjectIndex, Category::Scenes, config.userPointer);
+			}
+		}
 
 		if (config.extrasCallback != nullptr) {
 			dom::object extrasObject;
@@ -5172,6 +5219,10 @@ void fg::Parser::setExtrasParseCallback(ExtrasParseCallback *extrasCallback) noe
 	config.extrasCallback = extrasCallback;
 }
 
+void fg::Parser::setExtensionsParseCallback(ExtensionsParseCallback* extensionsCallback) noexcept {
+	config.extensionsCallback = extensionsCallback;
+}
+
 void fg::Parser::setUserPointer(void* pointer) noexcept {
     config.userPointer = pointer;
 }
@@ -5346,6 +5397,10 @@ void fg::Exporter::setFilePath(fs::path folder) {
 
 void fg::Exporter::setExtrasWriteCallback(ExtrasWriteCallback* callback) noexcept {
 	extrasWriteCallback = callback;
+}
+
+void fg::Exporter::setExtensionsWriteCallback(ExtensionsWriteCallback* callback) noexcept {
+	extensionsWriteCallback = callback;
 }
 
 void fg::Exporter::setUserPointer(void* pointer) noexcept {
@@ -5698,6 +5753,13 @@ void fg::Exporter::writeCameras(const Asset& asset, std::string& json) {
 				json += R"(},"type":"orthographic")";
 			}
 		}, it->camera);
+
+		if (extensionsWriteCallback != nullptr) {
+			auto genericExtensions = extensionsWriteCallback(uabs(std::distance(asset.cameras.begin(), it)), invalidSubObjectIndex, Category::Cameras, userPointer);
+			if (genericExtensions.has_value() && !genericExtensions->empty()) {
+				json += std::string(",\"extensions\":{") + *genericExtensions + '}';
+			}
+		}
 
 		if (extrasWriteCallback != nullptr) {
 			auto extras = extrasWriteCallback(uabs(std::distance(asset.cameras.begin(), it)), fastgltf::Category::Cameras, userPointer);
@@ -6285,6 +6347,13 @@ void fg::Exporter::writeMaterials(const Asset& asset, std::string& json) {
 			json += '}';
 		}
 
+		if (extensionsWriteCallback != nullptr) {
+			auto genericExtensions = extensionsWriteCallback(uabs(std::distance(asset.materials.begin(), it)), invalidSubObjectIndex, Category::Materials, userPointer);
+			if (genericExtensions.has_value() && !genericExtensions->empty()) {
+				if (json.back() != '{') json += ',';
+				json += *genericExtensions;
+			}
+		}
 		json += '}';
 
 		if (extrasWriteCallback != nullptr) {
@@ -6362,7 +6431,18 @@ void fg::Exporter::writeMeshes(const Asset& asset, std::string& json) {
                     json += R"(,"mode":)" + std::to_string(to_underlying(itp->type));
                 }
 
-				const bool hasExtensions = !itp->mappings.empty() || itp->dracoCompression;
+				std::optional<std::string> genericExtensions;
+				if (extensionsWriteCallback != nullptr) {
+					genericExtensions = extensionsWriteCallback(
+						uabs(std::distance(asset.meshes.begin(), it)),
+						uabs(std::distance(it->primitives.begin(), itp)),
+						Category::Meshes,
+						userPointer);
+					if (genericExtensions.has_value() && genericExtensions->empty())
+						genericExtensions.reset();
+				}
+
+				const bool hasExtensions = !itp->mappings.empty() || itp->dracoCompression || genericExtensions.has_value();
 				if (hasExtensions) {
 					json += R"(,"extensions":{)";
 				}
@@ -6392,6 +6472,10 @@ void fg::Exporter::writeMeshes(const Asset& asset, std::string& json) {
 					}
 					json += "}}";
 				}
+				if (genericExtensions.has_value()) {
+					if (json.back() != '{') json += ',';
+					json += *genericExtensions;
+				}
 				if (hasExtensions) {
 					json += "}";
 				}
@@ -6416,6 +6500,14 @@ void fg::Exporter::writeMeshes(const Asset& asset, std::string& json) {
 					json += ',';
 			}
 			json += ']';
+		}
+
+		if (extensionsWriteCallback != nullptr) {
+			auto genericExtensions = extensionsWriteCallback(uabs(std::distance(asset.meshes.begin(), it)), invalidSubObjectIndex, Category::Meshes, userPointer);
+			if (genericExtensions.has_value() && !genericExtensions->empty()) {
+				if (json.back() != '{') json += ',';
+				json += R"("extensions":{)" + *genericExtensions + '}';
+			}
 		}
 
 		if (extrasWriteCallback != nullptr) {
@@ -6538,11 +6630,19 @@ void fg::Exporter::writeNodes(const Asset& asset, std::string& json) {
 			},
 		}, it->transform);
 
+		std::optional<std::string> genericExtensions;
+		if (extensionsWriteCallback != nullptr) {
+			genericExtensions = extensionsWriteCallback(uabs(std::distance(asset.nodes.begin(), it)), invalidSubObjectIndex, Category::Nodes, userPointer);
+			if (genericExtensions.has_value() && genericExtensions->empty())
+				genericExtensions.reset();
+		}
+
 	    if (!it->instancingAttributes.empty() || it->lightIndex.has_value()
 #if FASTGLTF_ENABLE_KHR_PHYSICS_RIGID_BODIES
 			|| it->physicsRigidBody
 #endif
 			|| !it->visible || !it->selectable || !it->hoverable
+			|| genericExtensions.has_value()
 			) {
 			if (json.back() != '{') json += ',';
 			json += R"("extensions":{)";
@@ -6672,6 +6772,11 @@ void fg::Exporter::writeNodes(const Asset& asset, std::string& json) {
 	    		json += R"("KHR_node_hoverability":{"hoverable":false})";
 	    	}
 
+			if (genericExtensions.has_value()) {
+				if (json.back() != '{') json += ',';
+				json += *genericExtensions;
+			}
+
 			json += "}";
 		}
 
@@ -6765,6 +6870,14 @@ void fg::Exporter::writeScenes(const Asset& asset, std::string& json) {
 				json += ',';
 		}
 		json += ']';
+
+		if (extensionsWriteCallback != nullptr) {
+			auto genericExtensions = extensionsWriteCallback(uabs(std::distance(asset.scenes.begin(), it)), invalidSubObjectIndex, Category::Scenes, userPointer);
+			if (genericExtensions.has_value() && !genericExtensions->empty()) {
+				if (json.back() != '{') json += ',';
+				json += R"("extensions":{)" + *genericExtensions + '}';
+			}
+		}
 
 		if (extrasWriteCallback != nullptr) {
 			auto extras = extrasWriteCallback(uabs(std::distance(asset.scenes.begin(), it)), fastgltf::Category::Scenes, userPointer);
@@ -7251,6 +7364,14 @@ void fg::Exporter::writeExtensions(const fastgltf::Asset& asset, std::string& js
 			json += R"({"name":")" + variant + "\"}";
 		}
 		json += "]}";
+	}
+
+	if (extensionsWriteCallback != nullptr) {
+		auto genericExtensions = extensionsWriteCallback(0, invalidSubObjectIndex, Category::Asset, userPointer);
+		if (genericExtensions.has_value() && !genericExtensions->empty()) {
+			if (json.back() != '{') json += ',';
+			json += *genericExtensions;
+		}
 	}
 
     json += '}';
