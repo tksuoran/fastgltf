@@ -1930,6 +1930,9 @@ namespace fastgltf {
 	    FASTGLTF_FG_PMR_NS::MaybeSmallVector<AnimationSampler> samplers;
 
         FASTGLTF_STD_PMR_NS::string name;
+
+        /** The glTF 2.1 unique ID of this object; empty when the asset does not declare one. */
+        FASTGLTF_STD_PMR_NS::string uid;
     };
 
     FASTGLTF_EXPORT struct AssetInfo {
@@ -1964,6 +1967,9 @@ namespace fastgltf {
          */
         std::variant<Perspective, Orthographic> camera;
         FASTGLTF_STD_PMR_NS::string name;
+
+        /** The glTF 2.1 unique ID of this object; empty when the asset does not declare one. */
+        FASTGLTF_STD_PMR_NS::string uid;
     };
 
     FASTGLTF_EXPORT struct Skin {
@@ -1972,6 +1978,9 @@ namespace fastgltf {
         FASTGLTF_FG_PMR_NS::MaybeSmallVector<std::size_t> joints;
 
         FASTGLTF_STD_PMR_NS::string name;
+
+        /** The glTF 2.1 unique ID of this object; empty when the asset does not declare one. */
+        FASTGLTF_STD_PMR_NS::string uid;
     };
 
     FASTGLTF_EXPORT struct Sampler {
@@ -1981,12 +1990,18 @@ namespace fastgltf {
         Wrap wrapT = Wrap::Repeat;
 
         FASTGLTF_STD_PMR_NS::string name;
+
+        /** The glTF 2.1 unique ID of this object; empty when the asset does not declare one. */
+        FASTGLTF_STD_PMR_NS::string uid;
     };
 
     FASTGLTF_EXPORT struct Scene {
 	    FASTGLTF_FG_PMR_NS::MaybeSmallVector<std::size_t> nodeIndices;
 
         FASTGLTF_STD_PMR_NS::string name;
+
+        /** The glTF 2.1 unique ID of this object; empty when the asset does not declare one. */
+        FASTGLTF_STD_PMR_NS::string uid;
     };
 
 	FASTGLTF_EXPORT struct TRS {
@@ -2294,6 +2309,9 @@ namespace fastgltf {
 
         FASTGLTF_STD_PMR_NS::string name;
 
+        /** The glTF 2.1 unique ID of this object; empty when the asset does not declare one. */
+        FASTGLTF_STD_PMR_NS::string uid;
+
 #if FASTGLTF_ENABLE_KHR_PHYSICS_RIGID_BODIES
 		std::unique_ptr<PhysicsRigidBody> physicsRigidBody;
 #endif
@@ -2400,6 +2418,9 @@ namespace fastgltf {
 	    FASTGLTF_FG_PMR_NS::MaybeSmallVector<num> weights;
 
         FASTGLTF_STD_PMR_NS::string name;
+
+        /** The glTF 2.1 unique ID of this object; empty when the asset does not declare one. */
+        FASTGLTF_STD_PMR_NS::string uid;
     };
 
     /**
@@ -2649,6 +2670,9 @@ namespace fastgltf {
 		std::unique_ptr<MaterialPackedTextures> packedOcclusionRoughnessMetallicTextures;
 
         FASTGLTF_STD_PMR_NS::string name;
+
+        /** The glTF 2.1 unique ID of this object; empty when the asset does not declare one. */
+        FASTGLTF_STD_PMR_NS::string uid;
     };
 
     FASTGLTF_EXPORT struct Texture {
@@ -2680,12 +2704,18 @@ namespace fastgltf {
 		Optional<std::size_t> webpImageIndex;
 
         FASTGLTF_STD_PMR_NS::string name;
+
+        /** The glTF 2.1 unique ID of this object; empty when the asset does not declare one. */
+        FASTGLTF_STD_PMR_NS::string uid;
     };
 
     FASTGLTF_EXPORT struct Image {
         DataSource data;
 
         FASTGLTF_STD_PMR_NS::string name;
+
+        /** The glTF 2.1 unique ID of this object; empty when the asset does not declare one. */
+        FASTGLTF_STD_PMR_NS::string uid;
     };
 
     /**
@@ -2702,6 +2732,9 @@ namespace fastgltf {
         FASTGLTF_STD_PMR_NS::string mimeType;
 
         FASTGLTF_STD_PMR_NS::string name;
+
+        /** The glTF 2.1 unique ID of this object; empty when the asset does not declare one. */
+        FASTGLTF_STD_PMR_NS::string uid;
     };
 
     /**
@@ -2717,6 +2750,9 @@ namespace fastgltf {
         std::size_t fileIndex;
 
         FASTGLTF_STD_PMR_NS::string name;
+
+        /** The glTF 2.1 unique ID of this object; empty when the asset does not declare one. */
+        FASTGLTF_STD_PMR_NS::string uid;
     };
 
     FASTGLTF_EXPORT struct SparseAccessor {
@@ -2744,6 +2780,9 @@ namespace fastgltf {
 		Optional<SparseAccessor> sparse;
 
 		FASTGLTF_STD_PMR_NS::string name;
+
+		/** The glTF 2.1 unique ID of this object; empty when the asset does not declare one. */
+		FASTGLTF_STD_PMR_NS::string uid;
 
 		/**
 		 * Helper function that updates the max/min variables dynamically.
@@ -2816,6 +2855,9 @@ namespace fastgltf {
         std::unique_ptr<CompressedBufferView> meshoptCompression;
 
         FASTGLTF_STD_PMR_NS::string name;
+
+        /** The glTF 2.1 unique ID of this object; empty when the asset does not declare one. */
+        FASTGLTF_STD_PMR_NS::string uid;
     };
 
     FASTGLTF_EXPORT struct Buffer {
@@ -2824,6 +2866,9 @@ namespace fastgltf {
         DataSource data;
 
         FASTGLTF_STD_PMR_NS::string name;
+
+        /** The glTF 2.1 unique ID of this object; empty when the asset does not declare one. */
+        FASTGLTF_STD_PMR_NS::string uid;
     };
 
     FASTGLTF_EXPORT struct Light {

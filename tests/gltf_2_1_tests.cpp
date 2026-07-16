@@ -297,6 +297,156 @@ TEST_CASE("glTF MIME type strings", "[gltf-2.1]") {
 	REQUIRE(fastgltf::getMimeTypeString(fastgltf::MimeType::GltfBinary) == fastgltf::mimeTypeGltfBinary);
 }
 
+namespace {
+	// Covers a representative subset of the child-of-root object types that may carry a uid.
+	constexpr std::string_view uniqueIdsJson = R"({
+		"asset": {"version": "2.1"},
+		"accessors": [{"componentType": 5126, "count": 1, "type": "VEC3", "min": [0, 0, 0], "max": [0, 0, 0], "uid": "Accessor0"}],
+		"buffers": [{"byteLength": 3, "uri": "data:application/octet-stream;base64,AAAA", "uid": "Buffer0"}],
+		"bufferViews": [{"buffer": 0, "byteLength": 3, "uid": "BufferView0"}],
+		"cameras": [{"type": "perspective", "perspective": {"yfov": 1.0, "znear": 0.1}, "uid": "Camera0"}],
+		"materials": [
+			{"name": "RustySteel", "uid": "MaterialRustySteel"},
+			{"name": "Paint"}
+		],
+		"meshes": [{"primitives": [{"attributes": {"POSITION": 0}}], "uid": "Mesh0"}],
+		"nodes": [{"name": "Root", "uid": "NodeRoot"}],
+		"samplers": [{"uid": "Sampler0"}],
+		"scene": 0,
+		"scenes": [{"nodes": [0], "uid": "SceneMain"}]
+	})";
+
+	void checkUniqueIds(const fastgltf::Asset& asset) {
+		REQUIRE(asset.accessors.size() == 1);
+		REQUIRE(asset.accessors[0].uid == "Accessor0");
+		REQUIRE(asset.buffers.size() == 1);
+		REQUIRE(asset.buffers[0].uid == "Buffer0");
+		REQUIRE(asset.bufferViews.size() == 1);
+		REQUIRE(asset.bufferViews[0].uid == "BufferView0");
+		REQUIRE(asset.cameras.size() == 1);
+		REQUIRE(asset.cameras[0].uid == "Camera0");
+		REQUIRE(asset.materials.size() == 2);
+		REQUIRE(asset.materials[0].name == "RustySteel");
+		REQUIRE(asset.materials[0].uid == "MaterialRustySteel");
+		REQUIRE(asset.materials[1].name == "Paint");
+		REQUIRE(asset.materials[1].uid.empty());
+		REQUIRE(asset.meshes.size() == 1);
+		REQUIRE(asset.meshes[0].uid == "Mesh0");
+		REQUIRE(asset.nodes.size() == 1);
+		REQUIRE(asset.nodes[0].name == "Root");
+		REQUIRE(asset.nodes[0].uid == "NodeRoot");
+		REQUIRE(asset.samplers.size() == 1);
+		REQUIRE(asset.samplers[0].uid == "Sampler0");
+		REQUIRE(asset.scenes.size() == 1);
+		REQUIRE(asset.scenes[0].uid == "SceneMain");
+	}
+} // namespace
+
+TEST_CASE("Parse glTF 2.1 unique IDs", "[gltf-2.1]") {
+	auto jsonData = fastgltf::GltfDataBuffer::FromBytes(
+			reinterpret_cast<const std::byte*>(uniqueIdsJson.data()), uniqueIdsJson.size());
+	REQUIRE(jsonData.error() == fastgltf::Error::None);
+
+	fastgltf::Parser parser;
+	auto asset = parser.loadGltfJson(jsonData.get(), path);
+	REQUIRE(asset.error() == fastgltf::Error::None);
+	REQUIRE(fastgltf::validate(asset.get()) == fastgltf::Error::None);
+
+	checkUniqueIds(asset.get());
+}
+
+TEST_CASE("Roundtrip glTF 2.1 unique IDs", "[gltf-2.1]") {
+	auto jsonData = fastgltf::GltfDataBuffer::FromBytes(
+			reinterpret_cast<const std::byte*>(uniqueIdsJson.data()), uniqueIdsJson.size());
+	REQUIRE(jsonData.error() == fastgltf::Error::None);
+
+	fastgltf::Parser parser;
+	auto asset = parser.loadGltfJson(jsonData.get(), path);
+	REQUIRE(asset.error() == fastgltf::Error::None);
+
+	fastgltf::Exporter exporter;
+	auto expected = exporter.writeGltfJson(asset.get());
+	REQUIRE(expected.error() == fastgltf::Error::None);
+
+	auto exportedJsonData = fastgltf::GltfDataBuffer::FromBytes(
+			reinterpret_cast<const std::byte*>(expected.get().output.data()), expected.get().output.size());
+	REQUIRE(exportedJsonData.error() == fastgltf::Error::None);
+	auto reparsed = parser.loadGltfJson(exportedJsonData.get(), path);
+	REQUIRE(reparsed.error() == fastgltf::Error::None);
+	REQUIRE(fastgltf::validate(reparsed.get()) == fastgltf::Error::None);
+
+	checkUniqueIds(reparsed.get());
+}
+
+TEST_CASE("Exported assets with unique IDs declare glTF 2.1", "[gltf-2.1]") {
+	fastgltf::Asset asset;
+	auto& material = asset.materials.emplace_back();
+	material.name = "RustySteel";
+	material.uid = "MaterialRustySteel";
+
+	fastgltf::Exporter exporter;
+	auto expected = exporter.writeGltfJson(asset);
+	REQUIRE(expected.error() == fastgltf::Error::None);
+
+	const auto& output = expected.get().output;
+	REQUIRE(output.find(R"("version":"2.1")") != std::string::npos);
+	REQUIRE(output.find(R"("uid":"MaterialRustySteel")") != std::string::npos);
+}
+
+TEST_CASE("Validate glTF 2.1 unique IDs", "[gltf-2.1]") {
+	fastgltf::Parser parser;
+	auto parseJson = [&](std::string_view json) {
+		auto jsonData = fastgltf::GltfDataBuffer::FromBytes(
+				reinterpret_cast<const std::byte*>(json.data()), json.size());
+		REQUIRE(jsonData.error() == fastgltf::Error::None);
+		auto asset = parser.loadGltfJson(jsonData.get(), path);
+		REQUIRE(asset.error() == fastgltf::Error::None);
+		return std::move(asset.get());
+	};
+
+	SECTION("Duplicate uids within a category") {
+		auto asset = parseJson(R"({
+			"asset": {"version": "2.1"},
+			"materials": [{"uid": "A"}, {"uid": "A"}]
+		})");
+		REQUIRE(fastgltf::validate(asset) == fastgltf::Error::InvalidGltf);
+	}
+
+	SECTION("Duplicate uids across categories") {
+		auto asset = parseJson(R"({
+			"asset": {"version": "2.1"},
+			"materials": [{"uid": "A"}],
+			"nodes": [{"uid": "A"}]
+		})");
+		REQUIRE(fastgltf::validate(asset) == fastgltf::Error::InvalidGltf);
+	}
+
+	SECTION("A uid must not share a value with another object's name") {
+		auto asset = parseJson(R"({
+			"asset": {"version": "2.1"},
+			"materials": [{"uid": "A"}],
+			"nodes": [{"name": "A"}]
+		})");
+		REQUIRE(fastgltf::validate(asset) == fastgltf::Error::InvalidGltf);
+	}
+
+	SECTION("A uid may equal its own object's name") {
+		auto asset = parseJson(R"({
+			"asset": {"version": "2.1"},
+			"materials": [{"name": "A", "uid": "A"}]
+		})");
+		REQUIRE(fastgltf::validate(asset) == fastgltf::Error::None);
+	}
+
+	SECTION("Duplicate names without uids remain valid") {
+		auto asset = parseJson(R"({
+			"asset": {"version": "2.1"},
+			"materials": [{"name": "A"}, {"name": "A"}]
+		})");
+		REQUIRE(fastgltf::validate(asset) == fastgltf::Error::None);
+	}
+}
+
 TEST_CASE("glTF 2.1 category dependencies", "[gltf-2.1]") {
 	auto fixtureDir = path / "gltf_2_1";
 	fastgltf::Parser parser;

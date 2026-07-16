@@ -14,6 +14,7 @@ Unreleased
     - ``Options::LoadExternalFiles`` eagerly loads externally referenced files, mirroring ``Options::LoadExternalBuffers``. fastgltf never recursively parses referenced glTF assets and does not detect cross-file reference cycles; both are left to the application.
     - ``asset.minVersion`` is now parsed into ``AssetInfo::minVersion``, and assets requiring a glTF version newer than 2.1 are rejected with ``Error::UnsupportedVersion``.
     - Multiple scenes per asset are deprecated with glTF 2.1. fastgltf keeps parsing, validating, and writing them unchanged, as the specification requires importers to remain backwards compatible; new content should use at most one scene.
+    - Unique IDs (`KhronosGroup/glTF#2597 <https://github.com/KhronosGroup/glTF/issues/2597>`_): the optional ``uid`` string of every top-level (child-of-root) object is parsed into a new ``uid`` member on the corresponding type and written back by the exporter, which preserves existing uids exactly and never generates new ones. ``fastgltf::validate`` checks the 2.1 uniqueness rules (uids and names form a single identifier namespace).
 
 0.9.0
 =====

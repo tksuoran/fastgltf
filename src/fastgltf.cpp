@@ -33,6 +33,7 @@
 #include <fstream>
 #include <functional>
 #include <mutex>
+#include <unordered_map>
 #include <utility>
 
 #ifdef _MSC_VER
@@ -956,6 +957,59 @@ fg::Error fg::validate(const Asset& asset) {
 			return Error::InvalidGltf;
 	}
 
+	// glTF 2.1 unique IDs: a uid must be unique throughout the file and must not share a value
+	// with any other uid or name, as uids and names form a single identifier namespace. An
+	// object's own name may still equal its own uid, as both identify the same object.
+	{
+		// Maps each uid to its owning object, identified by category and index-in-category.
+		std::unordered_map<std::string_view, std::pair<Category, std::size_t>> uids;
+
+		const auto collectUids = [&](const auto& objects, const Category category) {
+			for (std::size_t i = 0; i < objects.size(); ++i) {
+				const auto& uid = objects[i].uid;
+				if (uid.empty())
+					continue;
+				if (!uids.emplace(std::string_view(uid), std::make_pair(category, i)).second)
+					return false;
+			}
+			return true;
+		};
+
+		if (!collectUids(asset.accessors, Category::Accessors) || !collectUids(asset.animations, Category::Animations)
+				|| !collectUids(asset.buffers, Category::Buffers) || !collectUids(asset.bufferViews, Category::BufferViews)
+				|| !collectUids(asset.cameras, Category::Cameras) || !collectUids(asset.externalAssets, Category::ExternalAssets)
+				|| !collectUids(asset.files, Category::Files) || !collectUids(asset.images, Category::Images)
+				|| !collectUids(asset.materials, Category::Materials) || !collectUids(asset.meshes, Category::Meshes)
+				|| !collectUids(asset.nodes, Category::Nodes) || !collectUids(asset.samplers, Category::Samplers)
+				|| !collectUids(asset.scenes, Category::Scenes) || !collectUids(asset.skins, Category::Skins)
+				|| !collectUids(asset.textures, Category::Textures))
+			return Error::InvalidGltf;
+
+		if (!uids.empty()) {
+			const auto anyNameCollides = [&](const auto& objects, const Category category) {
+				for (std::size_t i = 0; i < objects.size(); ++i) {
+					const auto& name = objects[i].name;
+					if (name.empty())
+						continue;
+					const auto it = uids.find(std::string_view(name));
+					if (it != uids.end() && it->second != std::make_pair(category, i))
+						return true;
+				}
+				return false;
+			};
+
+			if (anyNameCollides(asset.accessors, Category::Accessors) || anyNameCollides(asset.animations, Category::Animations)
+					|| anyNameCollides(asset.buffers, Category::Buffers) || anyNameCollides(asset.bufferViews, Category::BufferViews)
+					|| anyNameCollides(asset.cameras, Category::Cameras) || anyNameCollides(asset.externalAssets, Category::ExternalAssets)
+					|| anyNameCollides(asset.files, Category::Files) || anyNameCollides(asset.images, Category::Images)
+					|| anyNameCollides(asset.materials, Category::Materials) || anyNameCollides(asset.meshes, Category::Meshes)
+					|| anyNameCollides(asset.nodes, Category::Nodes) || anyNameCollides(asset.samplers, Category::Samplers)
+					|| anyNameCollides(asset.scenes, Category::Scenes) || anyNameCollides(asset.skins, Category::Skins)
+					|| anyNameCollides(asset.textures, Category::Textures))
+				return Error::InvalidGltf;
+		}
+	}
+
 	for (const auto& accessor : asset.accessors) {
 		if (accessor.type == AccessorType::Invalid)
 			return Error::InvalidGltf;
@@ -1875,6 +1929,11 @@ fg::Error fg::Parser::parseAccessors(const simdjson::dom::array& accessors, Asse
 	        accessor.name = FASTGLTF_CONSTRUCT_PMR_RESOURCE(decltype(accessor.name), resourceAllocator.get(), name);
         }
 
+		std::string_view uid;
+        if (accessorObject["uid"].get_string().get(uid) == SUCCESS) {
+	        accessor.uid = FASTGLTF_CONSTRUCT_PMR_RESOURCE(decltype(accessor.uid), resourceAllocator.get(), uid);
+        }
+
 	    asset.accessors.emplace_back(std::move(accessor));
     }
 
@@ -2006,6 +2065,11 @@ fg::Error fg::Parser::parseAnimations(simdjson::dom::array& animations, Asset& a
 	        animation.name = FASTGLTF_CONSTRUCT_PMR_RESOURCE(decltype(animation.name), resourceAllocator.get(), name);
         }
 
+		std::string_view uid;
+        if (animationObject["uid"].get_string().get(uid) == SUCCESS) {
+	        animation.uid = FASTGLTF_CONSTRUCT_PMR_RESOURCE(decltype(animation.uid), resourceAllocator.get(), uid);
+        }
+
 	    asset.animations.emplace_back(std::move(animation));
     }
 
@@ -2102,6 +2166,11 @@ fg::Error fg::Parser::parseBuffers(simdjson::dom::array& buffers, Asset& asset) 
 	        buffer.name = FASTGLTF_CONSTRUCT_PMR_RESOURCE(decltype(buffer.name), resourceAllocator.get(), name);
         }
 
+		std::string_view uid;
+        if (bufferObject["uid"].get_string().get(uid) == SUCCESS) {
+	        buffer.uid = FASTGLTF_CONSTRUCT_PMR_RESOURCE(decltype(buffer.uid), resourceAllocator.get(), uid);
+        }
+
         ++bufferIndex;
 	    asset.buffers.emplace_back(std::move(buffer));
     }
@@ -2152,6 +2221,12 @@ fg::Error fg::Parser::parseBufferViews(const simdjson::dom::array& bufferViews, 
         std::string_view string;
         if (auto error = bufferViewObject["name"].get_string().get(string); error == SUCCESS) {
 	        view.name = FASTGLTF_CONSTRUCT_PMR_RESOURCE(decltype(view.name), resourceAllocator.get(), string);
+        } else if (error != NO_SUCH_FIELD) FASTGLTF_UNLIKELY {
+            return Error::InvalidJson;
+        }
+
+        if (auto error = bufferViewObject["uid"].get_string().get(string); error == SUCCESS) {
+	        view.uid = FASTGLTF_CONSTRUCT_PMR_RESOURCE(decltype(view.uid), resourceAllocator.get(), string);
         } else if (error != NO_SUCH_FIELD) FASTGLTF_UNLIKELY {
             return Error::InvalidJson;
         }
@@ -2272,6 +2347,11 @@ fg::Error fg::Parser::parseCameras(simdjson::dom::array& cameras, Asset& asset) 
         std::string_view name;
         if (cameraObject["name"].get_string().get(name) == SUCCESS) {
 	        camera.name = FASTGLTF_CONSTRUCT_PMR_RESOURCE(decltype(camera.name), resourceAllocator.get(), name);
+        }
+
+        std::string_view uid;
+        if (cameraObject["uid"].get_string().get(uid) == SUCCESS) {
+	        camera.uid = FASTGLTF_CONSTRUCT_PMR_RESOURCE(decltype(camera.uid), resourceAllocator.get(), uid);
         }
 
         std::string_view type;
@@ -2520,6 +2600,12 @@ fg::Error fg::Parser::parseExternalAssets(const simdjson::dom::array& externalAs
             externalAsset.name = FASTGLTF_CONSTRUCT_PMR_RESOURCE(decltype(externalAsset.name), resourceAllocator.get(), name);
         }
 
+        // uid is optional.
+        std::string_view uid;
+        if (externalAssetObject["uid"].get_string().get(uid) == SUCCESS) {
+            externalAsset.uid = FASTGLTF_CONSTRUCT_PMR_RESOURCE(decltype(externalAsset.uid), resourceAllocator.get(), uid);
+        }
+
         asset.externalAssets.emplace_back(std::move(externalAsset));
     }
 
@@ -2602,6 +2688,12 @@ fg::Error fg::Parser::parseFiles(simdjson::dom::array& files, Asset& asset) {
         std::string_view name;
         if (fileObject["name"].get_string().get(name) == SUCCESS) {
             file.name = FASTGLTF_CONSTRUCT_PMR_RESOURCE(decltype(file.name), resourceAllocator.get(), name);
+        }
+
+        // uid is optional.
+        std::string_view uid;
+        if (fileObject["uid"].get_string().get(uid) == SUCCESS) {
+            file.uid = FASTGLTF_CONSTRUCT_PMR_RESOURCE(decltype(file.uid), resourceAllocator.get(), uid);
         }
 
         asset.files.emplace_back(std::move(file));
@@ -2698,6 +2790,12 @@ fg::Error fg::Parser::parseImages(simdjson::dom::array& images, Asset& asset) {
         std::string_view name;
         if (imageObject["name"].get_string().get(name) == SUCCESS) {
 	        image.name = FASTGLTF_CONSTRUCT_PMR_RESOURCE(decltype(image.name), resourceAllocator.get(), name);
+        }
+
+        // uid is optional.
+        std::string_view uid;
+        if (imageObject["uid"].get_string().get(uid) == SUCCESS) {
+	        image.uid = FASTGLTF_CONSTRUCT_PMR_RESOURCE(decltype(image.uid), resourceAllocator.get(), uid);
         }
 
         asset.images.emplace_back(std::move(image));
@@ -3548,6 +3646,11 @@ fg::Error fg::Parser::parseMaterials(simdjson::dom::array& materials, Asset& ass
 	        material.name = FASTGLTF_CONSTRUCT_PMR_RESOURCE(decltype(material.name), resourceAllocator.get(), name);
         }
 
+        std::string_view uid;
+        if (materialObject["uid"].get_string().get(uid) == SUCCESS) {
+	        material.uid = FASTGLTF_CONSTRUCT_PMR_RESOURCE(decltype(material.uid), resourceAllocator.get(), uid);
+        }
+
         dom::object extensionsObject;
         if (auto extensionError = materialObject["extensions"].get_object().get(extensionsObject); extensionError == SUCCESS) {
 			parseMaterialExtensions(extensionsObject, material);
@@ -3781,6 +3884,11 @@ fg::Error fg::Parser::parseMeshes(simdjson::dom::array& meshes, Asset& asset) {
 		std::string_view name;
         if (meshObject["name"].get_string().get(name) == SUCCESS) {
 	        mesh.name = FASTGLTF_CONSTRUCT_PMR_RESOURCE(decltype(mesh.name), resourceAllocator.get(), name);
+        }
+
+		std::string_view uid;
+        if (meshObject["uid"].get_string().get(uid) == SUCCESS) {
+	        mesh.uid = FASTGLTF_CONSTRUCT_PMR_RESOURCE(decltype(mesh.uid), resourceAllocator.get(), uid);
         }
 
         asset.meshes.emplace_back(std::move(mesh));
@@ -4041,6 +4149,11 @@ fg::Error fg::Parser::parseNodes(simdjson::dom::array& nodes, Asset& asset) {
 	        node.name = FASTGLTF_CONSTRUCT_PMR_RESOURCE(decltype(node.name), resourceAllocator.get(), name);
         }
 
+        std::string_view uid;
+        if (nodeObject["uid"].get_string().get(uid) == SUCCESS) {
+	        node.uid = FASTGLTF_CONSTRUCT_PMR_RESOURCE(decltype(node.uid), resourceAllocator.get(), uid);
+        }
+
         asset.nodes.emplace_back(std::move(node));
     }
 
@@ -4095,6 +4208,11 @@ fg::Error fg::Parser::parseSamplers(const simdjson::dom::array& samplers, Asset&
 			sampler.name = FASTGLTF_CONSTRUCT_PMR_RESOURCE(decltype(sampler.name), resourceAllocator.get(), name);
 		}
 
+		std::string_view uid;
+		if (samplerObject["uid"].get_string().get(uid) == SUCCESS) {
+			sampler.uid = FASTGLTF_CONSTRUCT_PMR_RESOURCE(decltype(sampler.uid), resourceAllocator.get(), uid);
+		}
+
 		asset.samplers.emplace_back(std::move(sampler));
     }
 
@@ -4116,6 +4234,11 @@ fg::Error fg::Parser::parseScenes(const simdjson::dom::array& scenes, Asset& ass
         std::string_view name;
         if (sceneObject["name"].get_string().get(name) == SUCCESS) {
 	        scene.name = FASTGLTF_CONSTRUCT_PMR_RESOURCE(decltype(scene.name), resourceAllocator.get(), name);
+        }
+
+        std::string_view uid;
+        if (sceneObject["uid"].get_string().get(uid) == SUCCESS) {
+	        scene.uid = FASTGLTF_CONSTRUCT_PMR_RESOURCE(decltype(scene.uid), resourceAllocator.get(), uid);
         }
 
 		if (config.extensionsCallback != nullptr) {
@@ -4207,6 +4330,11 @@ fg::Error fg::Parser::parseSkins(const simdjson::dom::array& skins, Asset& asset
         if (skinObject["name"].get_string().get(name) == SUCCESS) {
 	        skin.name = FASTGLTF_CONSTRUCT_PMR_RESOURCE(decltype(skin.name), resourceAllocator.get(), name);
         }
+
+		std::string_view uid;
+        if (skinObject["uid"].get_string().get(uid) == SUCCESS) {
+	        skin.uid = FASTGLTF_CONSTRUCT_PMR_RESOURCE(decltype(skin.uid), resourceAllocator.get(), uid);
+        }
         asset.skins.emplace_back(std::move(skin));
     }
 
@@ -4261,6 +4389,11 @@ fg::Error fg::Parser::parseTextures(const simdjson::dom::array& textures, Asset&
 		std::string_view name;
         if (textureObject["name"].get_string().get(name) == SUCCESS) {
 			texture.name = FASTGLTF_CONSTRUCT_PMR_RESOURCE(decltype(texture.name), resourceAllocator.get(), name);
+        }
+
+		std::string_view uid;
+        if (textureObject["uid"].get_string().get(uid) == SUCCESS) {
+			texture.uid = FASTGLTF_CONSTRUCT_PMR_RESOURCE(decltype(texture.uid), resourceAllocator.get(), uid);
         }
 
         asset.textures.emplace_back(std::move(texture));
@@ -5483,6 +5616,9 @@ void fg::Exporter::writeAccessors(const Asset& asset, std::string& json) {
 		if (!it->name.empty())
 			json += R"(,"name":")" + fg::escapeString(it->name) + '"';
 
+		if (!it->uid.empty())
+			json += R"(,"uid":")" + fg::escapeString(it->uid) + '"';
+
 		json += '}';
 		if (uabs(std::distance(asset.accessors.begin(), it)) + 1 <asset.accessors.size())
 			json += ',';
@@ -5563,6 +5699,9 @@ void fg::Exporter::writeAnimations(const Asset& asset, std::string& json)
 		if (!it->name.empty())
 			json += R"(,"name":")" + fg::escapeString(it->name) + '"';
 
+		if (!it->uid.empty())
+			json += R"(,"uid":")" + fg::escapeString(it->uid) + '"';
+
 		json += '}';
 		if (uabs(std::distance(asset.animations.begin(), it)) + 1 < asset.animations.size())
 			json += ',';
@@ -5634,6 +5773,8 @@ void fg::Exporter::writeBuffers(const Asset& asset, std::string& json) {
 
 		if (!it->name.empty())
 			json += R"(,"name":")" + fg::escapeString(it->name) + '"';
+		if (!it->uid.empty())
+			json += R"(,"uid":")" + fg::escapeString(it->uid) + '"';
 		json += '}';
 		if (uabs(std::distance(asset.buffers.begin(), it)) + 1 <asset.buffers.size())
 			json += ',';
@@ -5708,6 +5849,9 @@ void fg::Exporter::writeBufferViews(const Asset& asset, std::string& json) {
 		if (!it->name.empty())
 			json += R"(,"name":")" + fg::escapeString(it->name) + '"';
 
+		if (!it->uid.empty())
+			json += R"(,"uid":")" + fg::escapeString(it->uid) + '"';
+
 		json += '}';
 		if (uabs(std::distance(asset.bufferViews.begin(), it)) + 1 <asset.bufferViews.size())
 			json += ',';
@@ -5771,6 +5915,9 @@ void fg::Exporter::writeCameras(const Asset& asset, std::string& json) {
 		if (!it->name.empty())
 			json += R"(,"name":")" + fg::escapeString(it->name) + '"';
 
+		if (!it->uid.empty())
+			json += R"(,"uid":")" + fg::escapeString(it->uid) + '"';
+
 		json += '}';
 		if (uabs(std::distance(asset.cameras.begin(), it)) + 1 <asset.cameras.size())
 			json += ',';
@@ -5798,6 +5945,8 @@ void fg::Exporter::writeExternalAssets(const Asset& asset, std::string& json) {
 
 		if (!it->name.empty())
 			json += R"(,"name":")" + fg::escapeString(it->name) + '"';
+		if (!it->uid.empty())
+			json += R"(,"uid":")" + fg::escapeString(it->uid) + '"';
 		json += '}';
 		if (uabs(std::distance(asset.externalAssets.begin(), it)) + 1 < asset.externalAssets.size())
 			json += ',';
@@ -5855,6 +6004,8 @@ void fg::Exporter::writeFiles(const Asset& asset, std::string& json) {
 
 		if (!it->name.empty())
 			json += R"(,"name":")" + fg::escapeString(it->name) + '"';
+		if (!it->uid.empty())
+			json += R"(,"uid":")" + fg::escapeString(it->uid) + '"';
 		json += '}';
 		if (fileIdx + 1 < asset.files.size())
 			json += ',';
@@ -5915,6 +6066,8 @@ void fg::Exporter::writeImages(const Asset& asset, std::string& json) {
 
 		if (!it->name.empty())
 			json += R"(,"name":")" + fg::escapeString(it->name) + '"';
+		if (!it->uid.empty())
+			json += R"(,"uid":")" + fg::escapeString(it->uid) + '"';
 		json += '}';
 		if (uabs(std::distance(asset.images.begin(), it)) + 1 <asset.images.size())
 			json += ',';
@@ -6369,6 +6522,11 @@ void fg::Exporter::writeMaterials(const Asset& asset, std::string& json) {
 			if (json.back() != ',') json += ',';
 			json += R"("name":")" + fg::escapeString(it->name) + '"';
 		}
+
+		if (!it->uid.empty()) {
+			if (json.back() != ',') json += ',';
+			json += R"("uid":")" + fg::escapeString(it->uid) + '"';
+		}
 		json += '}';
 		if (uabs(std::distance(asset.materials.begin(), it)) + 1 <asset.materials.size())
 			json += ',';
@@ -6523,6 +6681,12 @@ void fg::Exporter::writeMeshes(const Asset& asset, std::string& json) {
             if (json.back() != '{')
                 json += ',';
             json += R"("name":")" + fg::escapeString(it->name) + '"';
+        }
+
+		if (!it->uid.empty()) {
+            if (json.back() != '{')
+                json += ',';
+            json += R"("uid":")" + fg::escapeString(it->uid) + '"';
         }
 		json += '}';
 		if (uabs(std::distance(asset.meshes.begin(), it)) + 1 <asset.meshes.size())
@@ -6794,6 +6958,12 @@ void fg::Exporter::writeNodes(const Asset& asset, std::string& json) {
 				json += ',';
 			json += R"("name":")" + fg::escapeString(it->name) + '"';
 		}
+
+		if (!it->uid.empty()) {
+			if (json.back() != '{')
+				json += ',';
+			json += R"("uid":")" + fg::escapeString(it->uid) + '"';
+		}
 		json += '}';
 		if (uabs(std::distance(asset.nodes.begin(), it)) + 1 <asset.nodes.size())
 			json += ',';
@@ -6839,6 +7009,11 @@ void fg::Exporter::writeSamplers(const Asset& asset, std::string& json) {
 		if (!it->name.empty()) {
 			if (json.back() != '{') json += ',';
 			json += R"("name":")" + fg::escapeString(it->name) + '"';
+		}
+
+		if (!it->uid.empty()) {
+			if (json.back() != '{') json += ',';
+			json += R"("uid":")" + fg::escapeString(it->uid) + '"';
 		}
 		json += '}';
 		if (uabs(std::distance(asset.samplers.begin(), it)) + 1 <asset.samplers.size())
@@ -6890,6 +7065,8 @@ void fg::Exporter::writeScenes(const Asset& asset, std::string& json) {
 
 		if (!it->name.empty())
 			json += R"(,"name":")" + fg::escapeString(it->name) + '"';
+		if (!it->uid.empty())
+			json += R"(,"uid":")" + fg::escapeString(it->uid) + '"';
 		json += '}';
 		if (uabs(std::distance(asset.scenes.begin(), it)) + 1 <asset.scenes.size())
 			json += ',';
@@ -6934,6 +7111,8 @@ void fg::Exporter::writeSkins(const Asset& asset, std::string& json) {
 
 		if (!it->name.empty())
 			json += R"(,"name":")" + fg::escapeString(it->name) + '"';
+		if (!it->uid.empty())
+			json += R"(,"uid":")" + fg::escapeString(it->uid) + '"';
 		json += '}';
 		if (uabs(std::distance(asset.skins.begin(), it)) + 1 <asset.skins.size())
 			json += ',';
@@ -6987,6 +7166,8 @@ void fg::Exporter::writeTextures(const Asset& asset, std::string& json) {
 
 		if (!it->name.empty())
 			json += R"(,"name":")" + fg::escapeString(it->name) + '"';
+		if (!it->uid.empty())
+			json += R"(,"uid":")" + fg::escapeString(it->uid) + '"';
 		json += '}';
 		if (uabs(std::distance(asset.textures.begin(), it)) + 1 <asset.textures.size())
 			json += ',';
@@ -7433,6 +7614,22 @@ fs::path fg::Exporter::getFileFilePath(const Asset& asset, std::size_t index) {
 	return fileFolder / (std::string(file.name) + std::string(extension));
 }
 
+namespace fastgltf {
+	/** Checks if any child-of-root object carries a glTF 2.1 unique ID. */
+	static bool assetUsesUids(const Asset& asset) {
+		auto anyUid = [](const auto& objects) {
+			return std::any_of(objects.begin(), objects.end(), [](const auto& object) {
+				return !object.uid.empty();
+			});
+		};
+		return anyUid(asset.accessors) || anyUid(asset.animations) || anyUid(asset.buffers)
+			|| anyUid(asset.bufferViews) || anyUid(asset.cameras) || anyUid(asset.externalAssets)
+			|| anyUid(asset.files) || anyUid(asset.images) || anyUid(asset.materials)
+			|| anyUid(asset.meshes) || anyUid(asset.nodes) || anyUid(asset.samplers)
+			|| anyUid(asset.scenes) || anyUid(asset.skins) || anyUid(asset.textures);
+	}
+} // namespace fastgltf
+
 std::string fg::Exporter::writeJson(const fastgltf::Asset &asset) {
     // Fairly rudimentary approach of just composing the JSON string using a std::string.
     std::string outputString;
@@ -7451,7 +7648,7 @@ std::string fg::Exporter::writeJson(const fastgltf::Asset &asset) {
         outputString += R"("version":")" + asset.assetInfo->gltfVersion + '"';
     } else {
         outputString += R"("generator":"fastgltf",)";
-        if (!asset.files.empty() || !asset.externalAssets.empty()) {
+        if (!asset.files.empty() || !asset.externalAssets.empty() || assetUsesUids(asset)) {
             // The asset uses glTF 2.1 features but does not declare a version itself.
             outputString += R"("version":"2.1")";
         } else {
