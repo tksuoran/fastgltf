@@ -7260,6 +7260,11 @@ void fg::Exporter::writePhysicsMaterials(const Asset& asset, std::string& json) 
         case CombineMode::Multiply:
 			json += R"("multiply")";
             break;
+        case CombineMode::Invalid:
+			// Unknown value from a malformed source asset; write the spec
+			// default so the already-opened JSON key stays valid.
+			json += R"("average")";
+            break;
         }
 		json += R"(,"restitutionCombine":)";
 		switch (material.restitutionCombine) {
@@ -7274,6 +7279,11 @@ void fg::Exporter::writePhysicsMaterials(const Asset& asset, std::string& json) 
 			break;
 		case CombineMode::Multiply:
 			json += R"("multiply")";
+			break;
+		case CombineMode::Invalid:
+			// Unknown value from a malformed source asset; write the spec
+			// default so the already-opened JSON key stays valid.
+			json += R"("average")";
 			break;
 		}
 
@@ -7459,6 +7469,12 @@ void fg::Exporter::writePhysicsJoints(const Asset& asset, std::string& json) {
                 case DriveType::Angular:
 					json += R"("angular")";
                     break;
+                case DriveType::Invalid:
+					// Unknown value from a malformed source asset; "type" is
+					// required, so write the first spec value rather than
+					// leave the already-opened JSON key without a value.
+					json += R"("linear")";
+                    break;
                 }
 
 				json += R"(,"mode":)";
@@ -7468,6 +7484,12 @@ void fg::Exporter::writePhysicsJoints(const Asset& asset, std::string& json) {
 					break;
 				case DriveMode::Acceleration:
 					json += R"("acceleration")";
+					break;
+				case DriveMode::Invalid:
+					// Unknown value from a malformed source asset; "mode" is
+					// required, so write the first spec value rather than
+					// leave the already-opened JSON key without a value.
+					json += R"("force")";
 					break;
 				}
 
