@@ -1932,7 +1932,7 @@ namespace fastgltf {
         FASTGLTF_STD_PMR_NS::string name;
 
         /** The glTF 2.1 unique ID of this object; empty when the asset does not declare one. */
-        FASTGLTF_STD_PMR_NS::string uid;
+        FASTGLTF_STD_PMR_NS::string uid{};
     };
 
     FASTGLTF_EXPORT struct AssetInfo {
@@ -1969,7 +1969,7 @@ namespace fastgltf {
         FASTGLTF_STD_PMR_NS::string name;
 
         /** The glTF 2.1 unique ID of this object; empty when the asset does not declare one. */
-        FASTGLTF_STD_PMR_NS::string uid;
+        FASTGLTF_STD_PMR_NS::string uid{};
     };
 
     FASTGLTF_EXPORT struct Skin {
@@ -1980,7 +1980,7 @@ namespace fastgltf {
         FASTGLTF_STD_PMR_NS::string name;
 
         /** The glTF 2.1 unique ID of this object; empty when the asset does not declare one. */
-        FASTGLTF_STD_PMR_NS::string uid;
+        FASTGLTF_STD_PMR_NS::string uid{};
     };
 
     FASTGLTF_EXPORT struct Sampler {
@@ -1992,7 +1992,7 @@ namespace fastgltf {
         FASTGLTF_STD_PMR_NS::string name;
 
         /** The glTF 2.1 unique ID of this object; empty when the asset does not declare one. */
-        FASTGLTF_STD_PMR_NS::string uid;
+        FASTGLTF_STD_PMR_NS::string uid{};
     };
 
     FASTGLTF_EXPORT struct Scene {
@@ -2001,7 +2001,7 @@ namespace fastgltf {
         FASTGLTF_STD_PMR_NS::string name;
 
         /** The glTF 2.1 unique ID of this object; empty when the asset does not declare one. */
-        FASTGLTF_STD_PMR_NS::string uid;
+        FASTGLTF_STD_PMR_NS::string uid{};
     };
 
 	FASTGLTF_EXPORT struct TRS {
@@ -2310,7 +2310,7 @@ namespace fastgltf {
         FASTGLTF_STD_PMR_NS::string name;
 
         /** The glTF 2.1 unique ID of this object; empty when the asset does not declare one. */
-        FASTGLTF_STD_PMR_NS::string uid;
+        FASTGLTF_STD_PMR_NS::string uid{};
 
 #if FASTGLTF_ENABLE_KHR_PHYSICS_RIGID_BODIES
 		std::unique_ptr<PhysicsRigidBody> physicsRigidBody;
@@ -2420,7 +2420,7 @@ namespace fastgltf {
         FASTGLTF_STD_PMR_NS::string name;
 
         /** The glTF 2.1 unique ID of this object; empty when the asset does not declare one. */
-        FASTGLTF_STD_PMR_NS::string uid;
+        FASTGLTF_STD_PMR_NS::string uid{};
     };
 
     /**
@@ -2672,7 +2672,7 @@ namespace fastgltf {
         FASTGLTF_STD_PMR_NS::string name;
 
         /** The glTF 2.1 unique ID of this object; empty when the asset does not declare one. */
-        FASTGLTF_STD_PMR_NS::string uid;
+        FASTGLTF_STD_PMR_NS::string uid{};
     };
 
     FASTGLTF_EXPORT struct Texture {
@@ -2706,7 +2706,7 @@ namespace fastgltf {
         FASTGLTF_STD_PMR_NS::string name;
 
         /** The glTF 2.1 unique ID of this object; empty when the asset does not declare one. */
-        FASTGLTF_STD_PMR_NS::string uid;
+        FASTGLTF_STD_PMR_NS::string uid{};
     };
 
     FASTGLTF_EXPORT struct Image {
@@ -2715,7 +2715,7 @@ namespace fastgltf {
         FASTGLTF_STD_PMR_NS::string name;
 
         /** The glTF 2.1 unique ID of this object; empty when the asset does not declare one. */
-        FASTGLTF_STD_PMR_NS::string uid;
+        FASTGLTF_STD_PMR_NS::string uid{};
     };
 
     /**
@@ -2734,7 +2734,7 @@ namespace fastgltf {
         FASTGLTF_STD_PMR_NS::string name;
 
         /** The glTF 2.1 unique ID of this object; empty when the asset does not declare one. */
-        FASTGLTF_STD_PMR_NS::string uid;
+        FASTGLTF_STD_PMR_NS::string uid{};
     };
 
     /**
@@ -2752,7 +2752,7 @@ namespace fastgltf {
         FASTGLTF_STD_PMR_NS::string name;
 
         /** The glTF 2.1 unique ID of this object; empty when the asset does not declare one. */
-        FASTGLTF_STD_PMR_NS::string uid;
+        FASTGLTF_STD_PMR_NS::string uid{};
     };
 
     FASTGLTF_EXPORT struct SparseAccessor {
@@ -2782,7 +2782,7 @@ namespace fastgltf {
 		FASTGLTF_STD_PMR_NS::string name;
 
 		/** The glTF 2.1 unique ID of this object; empty when the asset does not declare one. */
-		FASTGLTF_STD_PMR_NS::string uid;
+		FASTGLTF_STD_PMR_NS::string uid{};
 
 		/**
 		 * Helper function that updates the max/min variables dynamically.
@@ -2857,7 +2857,7 @@ namespace fastgltf {
         FASTGLTF_STD_PMR_NS::string name;
 
         /** The glTF 2.1 unique ID of this object; empty when the asset does not declare one. */
-        FASTGLTF_STD_PMR_NS::string uid;
+        FASTGLTF_STD_PMR_NS::string uid{};
     };
 
     FASTGLTF_EXPORT struct Buffer {
@@ -2868,7 +2868,7 @@ namespace fastgltf {
         FASTGLTF_STD_PMR_NS::string name;
 
         /** The glTF 2.1 unique ID of this object; empty when the asset does not declare one. */
-        FASTGLTF_STD_PMR_NS::string uid;
+        FASTGLTF_STD_PMR_NS::string uid{};
     };
 
     FASTGLTF_EXPORT struct Light {
