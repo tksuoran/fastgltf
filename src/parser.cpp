@@ -851,7 +851,7 @@ namespace fastgltf {
 			auto minVersion = detail::parseVersionString(*minVersionString);
 			if (minVersion.has_error())
 				return minVersion.error();
-			if (*minVersion > Version { 2, 0 }) [[unlikely]]
+			if (*minVersion > Version { 2, 1 }) [[unlikely]]
 				return Error::UnsupportedVersion;
 			info.minVersion = *minVersion;
 		}
