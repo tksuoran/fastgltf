@@ -189,6 +189,16 @@ which is still a draft and may change:
   glTF assets, and does not detect reference cycles across files; loading referenced assets
   (with a separate ``Parser`` invocation) and guarding against cycles is the application's
   responsibility.
+- **Unique IDs**: The optional ``uid`` string property of every top-level (child-of-root)
+  object is parsed into the ``uid`` member of the corresponding type (``Material::uid``,
+  ``Mesh::uid``, ``File::uid``, ...) and written back by the exporter. Per the
+  `Unique IDs explainer <https://github.com/KhronosGroup/glTF/issues/2597>`_ a uid must be
+  unique throughout the file and must not share a value with any other uid or ``name``, as
+  uids and names form a single identifier namespace; ``fastgltf::validate`` checks these
+  uniqueness rules. **fastgltf** never generates uids on its own — re-writing an asset
+  preserves existing uids exactly and leaves objects without one untouched. The exporter
+  writes the ``AssetInfo::version`` the application declares, so set it to 2.1 when writing
+  glTF 2.1 features.
 - **Multiple scene deprecation**: glTF 2.1 deprecates multiple scenes per asset; new content
   should contain at most one scene. As the specification requires importers to stay backwards
   compatible, **fastgltf** continues to parse, validate, and write multi-scene assets unchanged.

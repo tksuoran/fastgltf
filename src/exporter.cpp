@@ -524,6 +524,10 @@ void fg::Exporter::impl::writeAccessors(const Asset& asset, simdjson::builder::s
 			builder.append_comma();
 			builder.append_key_value<"name">(it->name);
 		}
+		if (!it->uid.empty()) {
+			builder.append_comma();
+			builder.append_key_value<"uid">(it->uid);
+		}
 	}
 }
 
@@ -612,6 +616,10 @@ void fg::Exporter::impl::writeAnimations(const Asset& asset, simdjson::builder::
 			builder.append_comma();
 			builder.append_key_value<"name">(it->name);
 		}
+		if (!it->uid.empty()) {
+			builder.append_comma();
+			builder.append_key_value<"uid">(it->uid);
+		}
 	}
 }
 
@@ -699,6 +707,10 @@ fg::Error fg::Exporter::impl::writeBuffers(const Asset& asset, simdjson::builder
 		if (!it->name.empty()) {
 			builder.append_comma();
 			builder.append_key_value<"name">(it->name);
+		}
+		if (!it->uid.empty()) {
+			builder.append_comma();
+			builder.append_key_value<"uid">(it->uid);
 		}
 	}
 
@@ -810,6 +822,10 @@ void fg::Exporter::impl::writeBufferViews(const Asset& asset, simdjson::builder:
 			builder.append_comma();
 			builder.append_key_value<"name">(it->name);
 		}
+		if (!it->uid.empty()) {
+			builder.append_comma();
+			builder.append_key_value<"uid">(it->uid);
+		}
 	}
 }
 
@@ -883,6 +899,10 @@ void fg::Exporter::impl::writeCameras(const Asset& asset, simdjson::builder::str
 			builder.append_comma();
 			builder.append_key_value<"name">(it->name);
 		}
+		if (!it->uid.empty()) {
+			builder.append_comma();
+			builder.append_key_value<"uid">(it->uid);
+		}
 	}
 }
 
@@ -911,6 +931,10 @@ void fg::Exporter::impl::writeExternalAssets(const Asset& asset, simdjson::build
 		if (!it->name.empty()) {
 			builder.append_comma();
 			builder.append_key_value<"name">(it->name);
+		}
+		if (!it->uid.empty()) {
+			builder.append_comma();
+			builder.append_key_value<"uid">(it->uid);
 		}
 	}
 }
@@ -965,6 +989,10 @@ fg::Error fg::Exporter::impl::writeFiles(const Asset& asset, simdjson::builder::
 		if (!it->name.empty()) {
 			builder.append_comma();
 			builder.append_key_value<"name">(it->name);
+		}
+		if (!it->uid.empty()) {
+			builder.append_comma();
+			builder.append_key_value<"uid">(it->uid);
 		}
 	}
 
@@ -1039,6 +1067,10 @@ fg::Error fg::Exporter::impl::writeImages(const Asset& asset, simdjson::builder:
 		if (!it->name.empty()) {
 			builder.append_comma();
 			builder.append_key_value<"name">(it->name);
+		}
+		if (!it->uid.empty()) {
+			builder.append_comma();
+			builder.append_key_value<"uid">(it->uid);
 		}
 	}
 
@@ -1529,6 +1561,10 @@ void fg::Exporter::impl::writeMaterials(const Asset& asset, simdjson::builder::s
 			builder.append_comma();
 			builder.append_key_value<"name">(it->name);
 		}
+		if (!it->uid.empty()) {
+			builder.append_comma();
+			builder.append_key_value<"uid">(it->uid);
+		}
 	}
 }
 
@@ -1676,6 +1712,10 @@ void fg::Exporter::impl::writeMeshes(const Asset& asset, simdjson::builder::stri
 		if (!it->name.empty()) {
 			comma();
 			builder.append_key_value<"name">(it->name);
+		}
+		if (!it->uid.empty()) {
+			comma();
+			builder.append_key_value<"uid">(it->uid);
 		}
 	}
 }
@@ -1936,6 +1976,10 @@ void fg::Exporter::impl::writeNodes(const Asset& asset, simdjson::builder::strin
 			comma();
 			builder.append_key_value<"name">(it->name);
 		}
+		if (!it->uid.empty()) {
+			comma();
+			builder.append_key_value<"uid">(it->uid);
+		}
 	}
 }
 
@@ -1982,6 +2026,10 @@ void fg::Exporter::impl::writeSamplers(const Asset& asset, simdjson::builder::st
 			comma();
 			builder.append_key_value<"name">(it->name);
 		}
+		if (!it->uid.empty()) {
+			comma();
+			builder.append_key_value<"uid">(it->uid);
+		}
 	}
 }
 
@@ -2025,6 +2073,10 @@ void fg::Exporter::impl::writeScenes(const Asset& asset, simdjson::builder::stri
 			comma();
 			builder.append_key_value<"name">(it->name);
 		}
+		if (!it->uid.empty()) {
+			comma();
+			builder.append_key_value<"uid">(it->uid);
+		}
 	}
 }
 
@@ -2063,6 +2115,10 @@ void fg::Exporter::impl::writeSkins(const Asset& asset, simdjson::builder::strin
 		if (!it->name.empty()) {
 			builder.append_comma();
 			builder.append_key_value<"name">(it->name);
+		}
+		if (!it->uid.empty()) {
+			builder.append_comma();
+			builder.append_key_value<"uid">(it->uid);
 		}
 	}
 }
@@ -2131,6 +2187,10 @@ void fg::Exporter::impl::writeTextures(const Asset& asset, simdjson::builder::st
 		if (!it->name.empty()) {
 			comma();
 			builder.append_key_value<"name">(it->name);
+		}
+		if (!it->uid.empty()) {
+			comma();
+			builder.append_key_value<"uid">(it->uid);
 		}
 	}
 }

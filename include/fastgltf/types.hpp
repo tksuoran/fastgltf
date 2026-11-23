@@ -869,6 +869,9 @@ namespace fastgltf {
 		std::vector<AnimationSampler> samplers;
 
 		std::string name;
+
+		/** The glTF 2.1 unique ID of this object; empty when the asset does not declare one. */
+		std::string uid {};
 	};
 
 	FASTGLTF_EXPORT struct Version {
@@ -917,6 +920,9 @@ namespace fastgltf {
 		 */
 		std::variant<Perspective, Orthographic> camera;
 		std::string name;
+
+		/** The glTF 2.1 unique ID of this object; empty when the asset does not declare one. */
+		std::string uid {};
 	};
 
 	FASTGLTF_EXPORT struct Skin {
@@ -925,6 +931,9 @@ namespace fastgltf {
 		std::vector<std::size_t> joints;
 
 		std::string name;
+
+		/** The glTF 2.1 unique ID of this object; empty when the asset does not declare one. */
+		std::string uid {};
 	};
 
 	FASTGLTF_EXPORT struct Sampler {
@@ -934,12 +943,18 @@ namespace fastgltf {
 		Wrap wrapT = Wrap::Repeat;
 
 		std::string name;
+
+		/** The glTF 2.1 unique ID of this object; empty when the asset does not declare one. */
+		std::string uid {};
 	};
 
 	FASTGLTF_EXPORT struct Scene {
 		std::vector<std::size_t> nodeIndices;
 
 		std::string name;
+
+		/** The glTF 2.1 unique ID of this object; empty when the asset does not declare one. */
+		std::string uid {};
 	};
 
 	FASTGLTF_EXPORT struct TRS {
@@ -1267,6 +1282,9 @@ namespace fastgltf {
 
 		std::string name;
 
+		/** The glTF 2.1 unique ID of this object; empty when the asset does not declare one. */
+		std::string uid {};
+
 		[[nodiscard]] auto findInstancingAttribute(const std::string_view attributeName) noexcept FASTGLTF_LIFETIMEBOUND {
 			return internal::findByName(instancingAttributes, attributeName);
 		}
@@ -1336,6 +1354,9 @@ namespace fastgltf {
 		std::vector<num> weights;
 
 		std::string name;
+
+		/** The glTF 2.1 unique ID of this object; empty when the asset does not declare one. */
+		std::string uid {};
 	};
 
 	/**
@@ -1610,6 +1631,9 @@ namespace fastgltf {
 		boxed_optional<MaterialPackedTextures> packedOcclusionRoughnessMetallicTextures;
 
 		std::string name;
+
+		/** The glTF 2.1 unique ID of this object; empty when the asset does not declare one. */
+		std::string uid {};
 	};
 
 	FASTGLTF_EXPORT struct Texture {
@@ -1646,12 +1670,18 @@ namespace fastgltf {
 		optional<std::size_t> avifImageIndex;
 
 		std::string name;
+
+		/** The glTF 2.1 unique ID of this object; empty when the asset does not declare one. */
+		std::string uid {};
 	};
 
 	FASTGLTF_EXPORT struct Image {
 		DataSource data;
 
 		std::string name;
+
+		/** The glTF 2.1 unique ID of this object; empty when the asset does not declare one. */
+		std::string uid {};
 	};
 
 	FASTGLTF_EXPORT struct SparseAccessor {
@@ -1679,6 +1709,9 @@ namespace fastgltf {
 		boxed_optional<SparseAccessor> sparse;
 
 		std::string name;
+
+		/** The glTF 2.1 unique ID of this object; empty when the asset does not declare one. */
+		std::string uid {};
 
 		/**
 		 * Helper function that updates the max/min variables dynamically.
@@ -1753,6 +1786,9 @@ namespace fastgltf {
 		boxed_optional<CompressedBufferView> meshoptCompression;
 
 		std::string name;
+
+		/** The glTF 2.1 unique ID of this object; empty when the asset does not declare one. */
+		std::string uid {};
 	};
 
 	FASTGLTF_EXPORT struct Buffer {
@@ -1761,6 +1797,9 @@ namespace fastgltf {
 		DataSource data;
 
 		std::string name;
+
+		/** The glTF 2.1 unique ID of this object; empty when the asset does not declare one. */
+		std::string uid {};
 	};
 
 	/**
@@ -1778,6 +1817,9 @@ namespace fastgltf {
 		std::string mimeType;
 
 		std::string name;
+
+		/** The glTF 2.1 unique ID of this object; empty when the asset does not declare one. */
+		std::string uid {};
 	};
 
 	/**
@@ -1793,6 +1835,9 @@ namespace fastgltf {
 		std::size_t fileIndex;
 
 		std::string name;
+
+		/** The glTF 2.1 unique ID of this object; empty when the asset does not declare one. */
+		std::string uid {};
 	};
 
 	FASTGLTF_EXPORT struct Light {

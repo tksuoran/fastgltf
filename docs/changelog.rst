@@ -13,6 +13,7 @@ Unreleased
 - Add: Support for a subset of the glTF 2.1 proposal (`KhronosGroup/glTF#2585 <https://github.com/KhronosGroup/glTF/issues/2585>`_)
     - The top-level ``files`` array (Unified File References) is parsed into ``Asset::files``, and the ``externalAssets`` array (External Assets) into ``Asset::externalAssets``; nodes expose ``Node::externalAssetIndex``. Both arrays are also written by the exporter, and ``FileExporter`` writes loaded file entries to disk.
     - ``Options::LoadExternalFiles`` eagerly loads externally referenced files, mirroring ``Options::LoadExternalBuffers``. fastgltf never recursively parses referenced glTF assets and does not detect cross-file reference cycles; both are left to the application.
+    - Unique IDs (`KhronosGroup/glTF#2597 <https://github.com/KhronosGroup/glTF/issues/2597>`_): the optional ``uid`` string of every top-level (child-of-root) object is parsed into a new ``uid`` member on the corresponding type and written back by the exporter, which preserves existing uids exactly and never generates new ones. ``fastgltf::validate`` checks the 2.1 uniqueness rules (uids and names form a single identifier namespace).
     - Multiple scenes per asset are deprecated with glTF 2.1. fastgltf keeps parsing, validating, and writing them unchanged, as the specification requires importers to remain backwards compatible.
 
 1.0.1

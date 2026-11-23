@@ -24,6 +24,10 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
+#include <string_view>
+#include <unordered_map>
+#include <utility>
+
 #include <fastgltf/core.hpp>
 #include <fastgltf/types.hpp>
 
@@ -553,6 +557,52 @@ fg::Error fg::validate(const Asset& asset) {
 			if (node >= asset.nodes.size())
 				return Error::InvalidGltf;
 		}
+	}
+
+	// glTF 2.1 unique IDs: a uid must be unique throughout the file and must not share a value
+	// with any other uid or name, as uids and names form a single identifier namespace. An
+	// object's own name may still equal its own uid, as both identify the same object.
+	{
+		// Maps each uid to its owning object, identified by category and index-in-category.
+		std::unordered_map<std::string_view, std::pair<Category, std::size_t>> uids;
+
+		const auto forEachObjectType = [&asset](auto&& func) {
+			return func(asset.accessors, Category::Accessors) && func(asset.animations, Category::Animations)
+				&& func(asset.buffers, Category::Buffers) && func(asset.bufferViews, Category::BufferViews)
+				&& func(asset.cameras, Category::Cameras) && func(asset.externalAssets, Category::ExternalAssets)
+				&& func(asset.files, Category::Files) && func(asset.images, Category::Images)
+				&& func(asset.materials, Category::Materials) && func(asset.meshes, Category::Meshes)
+				&& func(asset.nodes, Category::Nodes) && func(asset.samplers, Category::Samplers)
+				&& func(asset.scenes, Category::Scenes) && func(asset.skins, Category::Skins)
+				&& func(asset.textures, Category::Textures);
+		};
+
+		const auto collectUids = [&](const auto& objects, const Category category) {
+			for (std::size_t i = 0; i < objects.size(); ++i) {
+				const auto& uid = objects[i].uid;
+				if (uid.empty())
+					continue;
+				if (!uids.emplace(std::string_view(uid), std::make_pair(category, i)).second)
+					return false;
+			}
+			return true;
+		};
+		if (!forEachObjectType(collectUids))
+			return Error::InvalidGltf;
+
+		const auto noNameCollides = [&](const auto& objects, const Category category) {
+			for (std::size_t i = 0; i < objects.size(); ++i) {
+				const auto& name = objects[i].name;
+				if (name.empty())
+					continue;
+				const auto it = uids.find(std::string_view(name));
+				if (it != uids.end() && it->second != std::make_pair(category, i))
+					return false;
+			}
+			return true;
+		};
+		if (!uids.empty() && !forEachObjectType(noNameCollides))
+			return Error::InvalidGltf;
 	}
 
 	for (const auto& externalAsset : asset.externalAssets) {

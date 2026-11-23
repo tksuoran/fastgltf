@@ -1130,10 +1130,10 @@ fg::Error fg::Parser::parseAccessors(internal::JsonArray& accessorsJson, Asset& 
 		const auto error = accessorValue.get_object().for_each<
 			"bufferView", "byteOffset", "componentType", "normalized",
 			"count", "type", "max", "min",
-			"sparse", "name", "extras">(
+			"sparse", "name", "uid", "extras">(
 			accessor.bufferViewIndex, accessor.byteOffset, componentType, accessor.normalized,
 			count, type, max, min,
-			accessor.sparse, accessor.name, extras);
+			accessor.sparse, accessor.name, accessor.uid, extras);
 		if (error != SUCCESS) [[unlikely]]
 			return toError(error);
 
@@ -1239,8 +1239,8 @@ fg::Error fg::Parser::parseAnimations(internal::JsonArray& animationsJson, Asset
 		auto& animation = asset.animations.emplace_back();
 
 		const auto error = animationValue.get_object().for_each<
-			"channels", "samplers", "name", "extras">(
-			animation.channels, animation.samplers, animation.name, extras);
+			"channels", "samplers", "name", "uid", "extras">(
+			animation.channels, animation.samplers, animation.name, animation.uid, extras);
 		if (error != SUCCESS) [[unlikely]]
 			return toError(error);
 
@@ -1283,8 +1283,8 @@ fg::Error fg::Parser::parseBuffers(internal::JsonArray& buffersJson, Asset& asse
 		std::optional<std::string_view> uriString;
 
 		const auto error = bufferValue.get_object().for_each<
-			"uri", "byteLength", "name", "extras">(
-			uriString, byteLength, buffer.name, extras);
+			"uri", "byteLength", "name", "uid", "extras">(
+			uriString, byteLength, buffer.name, buffer.uid, extras);
 		if (error != SUCCESS) [[unlikely]]
 			return toError(error);
 
@@ -1403,9 +1403,9 @@ fg::Error fg::Parser::parseBufferViews(internal::JsonArray& bufferViewsJson, Ass
 
 		const auto error = bufferViewValue.get_object().for_each<
 			"buffer", "byteOffset", "byteLength", "byteStride",
-			"target", "name", "extensions", "extras">(
+			"target", "name", "uid", "extensions", "extras">(
 			buffer, view.byteOffset, byteLength, view.byteStride,
-			view.target, view.name, readExtensions, extras);
+			view.target, view.name, view.uid, readExtensions, extras);
 		if (error != SUCCESS) [[unlikely]]
 			return toError(error);
 
@@ -1484,8 +1484,8 @@ fg::Error fg::Parser::parseCameras(internal::JsonArray& camerasJson, Asset& asse
 		std::optional<Camera::Orthographic> orthographic;
 
 		const auto error = cameraValue.get_object().for_each<
-			"type", "perspective", "orthographic", "name", "extensions", "extras">(
-			type, perspective, orthographic, camera.name,
+			"type", "perspective", "orthographic", "name", "uid", "extensions", "extras">(
+			type, perspective, orthographic, camera.name, camera.uid,
 			readExtensions(config, asset.cameras.size() - 1, invalidSubObjectIndex, Category::Cameras),
 			extras);
 		if (error != SUCCESS) [[unlikely]]
@@ -1597,8 +1597,8 @@ fg::Error fg::Parser::parseImages(internal::JsonArray& imagesJson, Asset& asset)
 		optional<std::size_t> bufferViewIndex;
 
 		const auto error = imageValue.get_object().for_each<
-			"uri", "mimeType", "bufferView", "name", "extras">(
-			uriString, mimeType, bufferViewIndex, image.name, extras);
+			"uri", "mimeType", "bufferView", "name", "uid", "extras">(
+			uriString, mimeType, bufferViewIndex, image.name, image.uid, extras);
 		if (error != SUCCESS) [[unlikely]]
 			return toError(error);
 
@@ -1677,8 +1677,8 @@ fg::Error fg::Parser::parseExternalAssets(internal::JsonArray& externalAssetsJso
 		auto& externalAsset = asset.externalAssets.emplace_back();
 
 		optional<std::size_t> fileIndex;
-		const auto error = externalAssetValue.get_object().for_each<"file", "name", "extras">(
-			fileIndex, externalAsset.name, extras);
+		const auto error = externalAssetValue.get_object().for_each<"file", "name", "uid", "extras">(
+			fileIndex, externalAsset.name, externalAsset.uid, extras);
 		if (error != SUCCESS) [[unlikely]]
 			return toError(error);
 
@@ -1703,8 +1703,8 @@ fg::Error fg::Parser::parseFiles(internal::JsonArray& filesJson, Asset& asset) {
 		auto& file = asset.files.emplace_back();
 
 		std::optional<std::string_view> uriString, mimeType;
-		const auto error = fileValue.get_object().for_each<"uri", "mimeType", "name", "extras">(
-			uriString, mimeType, file.name, extras);
+		const auto error = fileValue.get_object().for_each<"uri", "mimeType", "name", "uid", "extras">(
+			uriString, mimeType, file.name, file.uid, extras);
 		if (error != SUCCESS) [[unlikely]]
 			return toError(error);
 
@@ -2022,12 +2022,12 @@ fg::Error fg::Parser::parseMaterials(internal::JsonArray& materialsJson, Asset& 
 		});
 
 		const auto error = materialValue.get_object().for_each<
-			"name", "pbrMetallicRoughness",
+			"name", "uid", "pbrMetallicRoughness",
 			"normalTexture", "occlusionTexture",
 			"emissiveTexture", "emissiveFactor",
 			"alphaMode", "alphaCutoff", "doubleSided",
 			"extensions", "extras">(
-			material.name, readPbr,
+			material.name, material.uid, readPbr,
 			readTexture(material.normalTexture), readTexture(material.occlusionTexture),
 			readTexture(material.emissiveTexture), material.emissiveFactor,
 			material.alphaMode, material.alphaCutoff, material.doubleSided,
@@ -2166,8 +2166,8 @@ fg::Error fg::Parser::parseMeshes(internal::JsonArray& meshesJson, Asset& asset)
 		};
 
 		const auto error = meshValue.get_object().for_each<
-			"primitives", "weights", "name", "extensions", "extras">(
-			readPrimitives, mesh.weights, mesh.name,
+			"primitives", "weights", "name", "uid", "extensions", "extras">(
+			readPrimitives, mesh.weights, mesh.name, mesh.uid,
 			readExtensions(config, meshIndex, invalidSubObjectIndex, Category::Meshes),
 			extras);
 		if (error != SUCCESS) [[unlikely]]
@@ -2257,10 +2257,10 @@ fg::Error fg::Parser::parseNodes(internal::JsonArray& nodesJson, Asset& asset) {
 		const auto error = nodeValue.get_object().for_each<
 			"camera", "children", "skin", "matrix",
 			"mesh", "rotation", "scale", "translation",
-			"weights", "name", "externalAsset", "extensions", "extras">(
+			"weights", "name", "uid", "externalAsset", "extensions", "extras">(
 			node.cameraIndex, node.children, node.skinIndex, matrix,
 			node.meshIndex, trs.rotation, trs.scale, trs.translation,
-			node.weights, node.name, node.externalAssetIndex, readNodeExtensions, extras);
+			node.weights, node.name, node.uid, node.externalAssetIndex, readNodeExtensions, extras);
 		if (error != SUCCESS) [[unlikely]]
 			return toError(error);
 
@@ -2295,9 +2295,9 @@ fg::Error fg::Parser::parseSamplers(internal::JsonArray& samplersJson, Asset& as
 
 		const auto error = samplerValue.get_object().for_each<
 			"magFilter", "minFilter", "wrapS", "wrapT",
-			"name", "extras">(
+			"name", "uid", "extras">(
 			sampler.magFilter, sampler.minFilter, sampler.wrapS, sampler.wrapT,
-			sampler.name, extras);
+			sampler.name, sampler.uid, extras);
 		if (error != SUCCESS) [[unlikely]]
 			return toError(error);
 	}
@@ -2318,8 +2318,8 @@ fg::Error fg::Parser::parseScenes(internal::JsonArray& scenesJson, Asset& asset)
 		// The scene object can be completely empty
 		auto& scene = asset.scenes.emplace_back();
 
-		const auto error = sceneValue.get_object().for_each<"nodes", "name", "extensions", "extras">(
-			scene.nodeIndices, scene.name,
+		const auto error = sceneValue.get_object().for_each<"nodes", "name", "uid", "extensions", "extras">(
+			scene.nodeIndices, scene.name, scene.uid,
 			readExtensions(config, asset.scenes.size() - 1, invalidSubObjectIndex, Category::Scenes),
 			extras);
 		if (error != SUCCESS) [[unlikely]]
@@ -2342,8 +2342,8 @@ fg::Error fg::Parser::parseSkins(internal::JsonArray& skinsJson, Asset& asset) {
 		auto& skin = asset.skins.emplace_back();
 
 		const auto error = skinValue.get_object().for_each<
-			"inverseBindMatrices", "skeleton", "joints", "name", "extras">(
-			skin.inverseBindMatrices, skin.skeleton, skin.joints, skin.name, extras);
+			"inverseBindMatrices", "skeleton", "joints", "name", "uid", "extras">(
+			skin.inverseBindMatrices, skin.skeleton, skin.joints, skin.name, skin.uid, extras);
 		if (error != SUCCESS) [[unlikely]]
 			return toError(error);
 
@@ -2375,8 +2375,8 @@ fg::Error fg::Parser::parseTextures(internal::JsonArray& texturesJson, Asset& as
 		// The index of the sampler used by this texture. When undefined, a sampler with
 		// repeat wrapping and auto filtering SHOULD be used.
 		const auto error = textureValue.get_object().for_each<
-			"sampler", "source", "name", "extensions", "extras">(
-			texture.samplerIndex, texture.imageIndex, texture.name, readExtensions, extras);
+			"sampler", "source", "name", "uid", "extensions", "extras">(
+			texture.samplerIndex, texture.imageIndex, texture.name, texture.uid, readExtensions, extras);
 		if (error != SUCCESS) [[unlikely]]
 			return toError(error);
 	}
