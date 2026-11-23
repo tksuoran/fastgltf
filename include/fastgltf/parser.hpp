@@ -233,6 +233,16 @@ namespace fastgltf {
 		 * loading process.
 		 */
 		GenerateMeshIndices = 1 << 8,
+
+		/**
+		 * Loads files referenced by local file URIs in the glTF 2.1 "files" array into
+		 * sources::Array, or sources::CustomBuffer when a buffer allocation callback supplies memory,
+		 * mirroring LoadExternalBuffers and LoadExternalImages. If disabled, these files remain
+		 * sources::URI. Data URIs are decoded independently of this option. Note that fastgltf never
+		 * recursively parses glTF assets referenced through "externalAssets", and does not detect
+		 * reference cycles across files; both are the application's responsibility.
+		 */
+		LoadExternalFiles = 1 << 9,
 	};
 	// clang-format on
 
@@ -685,6 +695,8 @@ namespace fastgltf {
 		Error parseCameras(internal::JsonArray& array, Asset& asset);
 		Error parseCollisionFilters(internal::JsonArray& collisionFilters, Asset& asset);
 		Error parseExtensions(internal::JsonObject& extensionsObject, Asset& asset);
+		Error parseExternalAssets(internal::JsonArray& array, Asset& asset);
+		Error parseFiles(internal::JsonArray& array, Asset& asset);
 		Error parseImages(internal::JsonArray& array, Asset& asset);
 		Error parseLights(internal::JsonArray& array, Asset& asset);
 		Error parseMaterialExtensions(internal::JsonObject& object, Material& material);

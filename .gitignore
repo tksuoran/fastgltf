@@ -37,6 +37,7 @@ tests/gltf_loaders/
 tests/gltf/export/
 tests/gltf/export_glb/
 tests/gltf/export_gltf/
+tests/gltf/export_gltf_2_1/
 tests/gltf_validator
 
 # gltf Rust wrapper

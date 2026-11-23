@@ -489,6 +489,8 @@ fg::Error fg::validate(const Asset& asset) {
 			return Error::InvalidGltf;
 		if (node.meshIndex.has_value() && asset.meshes.size() <= node.meshIndex.value())
 			return Error::InvalidGltf;
+		if (node.externalAssetIndex.has_value() && asset.externalAssets.size() <= node.externalAssetIndex.value())
+			return Error::InvalidGltf;
 
 		constexpr auto isnotfinite = [](auto x) { return !std::isfinite(x); };
 		if (const auto* pTRS = std::get_if<TRS>(&node.transform)) {
@@ -551,6 +553,18 @@ fg::Error fg::validate(const Asset& asset) {
 			if (node >= asset.nodes.size())
 				return Error::InvalidGltf;
 		}
+	}
+
+	for (const auto& externalAsset : asset.externalAssets) {
+		if (externalAsset.fileIndex >= asset.files.size())
+			return Error::InvalidGltf;
+	}
+
+	for (const auto& file : asset.files) {
+		if (file.mimeType.empty())
+			return Error::InvalidGltf;
+		if (std::holds_alternative<std::monostate>(file.data))
+			return Error::InvalidGltf;
 	}
 
 	for (const auto& skin : asset.skins) {

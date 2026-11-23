@@ -151,6 +151,22 @@ Camera
    :undoc-members:
 
 
+ExternalAsset
+-------------
+
+.. doxygenstruct:: fastgltf::ExternalAsset
+   :members:
+   :undoc-members:
+
+
+File
+----
+
+.. doxygenstruct:: fastgltf::File
+   :members:
+   :undoc-members:
+
+
 Image
 -----
 

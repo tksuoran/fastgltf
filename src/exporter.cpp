@@ -61,15 +61,18 @@ struct fastgltf::Exporter::impl {
 
 	std::filesystem::path bufferFolder = "";
 	std::filesystem::path imageFolder = "";
+	std::filesystem::path fileFolder = "";
 
 	void* userPointer = nullptr;
 	ExtrasWriteCallback* extrasWriteCallback = nullptr;
 
 	std::vector<std::optional<std::filesystem::path>> bufferPaths;
 	std::vector<std::optional<std::filesystem::path>> imagePaths;
+	std::vector<std::optional<std::filesystem::path>> filePaths;
 
 	void setBufferPath(std::filesystem::path folder);
 	void setImagePath(std::filesystem::path folder);
+	void setFilePath(std::filesystem::path folder);
 	void setExtrasWriteCallback(ExtrasWriteCallback* callback) noexcept;
 	void setUserPointer(void* pointer) noexcept;
 
@@ -79,6 +82,8 @@ struct fastgltf::Exporter::impl {
 	void writeBufferViews(const Asset& asset, simdjson::builder::string_builder& builder);
 	void writeCameras(const Asset& asset, simdjson::builder::string_builder& builder);
 	void writeCollisionFilters(const Asset& asset, simdjson::builder::string_builder& builder);
+	void writeExternalAssets(const Asset& asset, simdjson::builder::string_builder& builder);
+	Error writeFiles(const Asset& asset, simdjson::builder::string_builder& builder);
 	Error writeImages(const Asset& asset, simdjson::builder::string_builder& builder);
 	void writeLights(const Asset& asset, simdjson::builder::string_builder& builder);
 	void writeMaterialExtensions(const Material& material, simdjson::builder::string_builder& builder);
@@ -96,6 +101,7 @@ struct fastgltf::Exporter::impl {
 
 	std::filesystem::path getBufferFilePath(const Asset& asset, std::size_t index);
 	std::filesystem::path getImageFilePath(const Asset& asset, std::size_t index, MimeType mimeType);
+	std::filesystem::path getFileFilePath(const Asset& asset, std::size_t index);
 
 	Expected<std::string> writeJson(const Asset& asset);
 
@@ -115,12 +121,20 @@ namespace fastgltf {
 		return _impl->imagePaths;
 	}
 
+	std::span<std::optional<std::filesystem::path>> fg::Exporter::getFilePaths() {
+		return _impl->filePaths;
+	}
+
 	void fg::Exporter::setBufferPath(fs::path folder) {
 		_impl->setBufferPath(std::move(folder));
 	}
 
 	void fg::Exporter::setImagePath(fs::path folder) {
 		_impl->setImagePath(std::move(folder));
+	}
+
+	void fg::Exporter::setFilePath(fs::path folder) {
+		_impl->setFilePath(std::move(folder));
 	}
 
 	void fg::Exporter::setExtrasWriteCallback(ExtrasWriteCallback* callback) noexcept {
@@ -379,6 +393,13 @@ void fg::Exporter::impl::setImagePath(fs::path folder) {
 		return;
 	}
 	imageFolder = std::move(folder);
+}
+
+void fg::Exporter::impl::setFilePath(fs::path folder) {
+	if (!folder.is_relative()) {
+		return;
+	}
+	fileFolder = std::move(folder);
 }
 
 void fg::Exporter::impl::setExtrasWriteCallback(ExtrasWriteCallback *callback) noexcept {
@@ -825,6 +846,91 @@ void fg::Exporter::impl::writeCameras(const Asset& asset, simdjson::builder::str
 			builder.append_key_value<"name">(it->name);
 		}
 	}
+}
+
+void fg::Exporter::impl::writeExternalAssets(const Asset& asset, simdjson::builder::string_builder& builder) {
+	if (asset.externalAssets.empty())
+		return;
+
+	auto externalAssets = scoped_array<"externalAssets">(builder);
+
+	for (auto it = asset.externalAssets.begin(); it != asset.externalAssets.end(); ++it) {
+		if (it != asset.externalAssets.begin())
+			builder.append_comma();
+
+		auto obj = scoped_object(builder);
+
+		builder.append_key_value<"file">(it->fileIndex);
+
+		if (extrasWriteCallback != nullptr) {
+			auto extras = extrasWriteCallback(uabs(std::distance(asset.externalAssets.begin(), it)), Category::ExternalAssets, userPointer);
+			if (extras.has_value()) {
+				builder.append_comma();
+				append_raw_key_value<"extras">(builder, *extras);
+			}
+		}
+
+		if (!it->name.empty()) {
+			builder.append_comma();
+			builder.append_key_value<"name">(it->name);
+		}
+	}
+}
+
+fg::Error fg::Exporter::impl::writeFiles(const Asset& asset, simdjson::builder::string_builder& builder) {
+	if (asset.files.empty())
+		return Error::None;
+
+	auto files = scoped_array<"files">(builder);
+
+	for (auto it = asset.files.begin(); it != asset.files.end(); ++it) {
+		if (it != asset.files.begin())
+			builder.append_comma();
+
+		auto obj = scoped_object(builder);
+
+		auto fileIdx = uabs(std::distance(asset.files.begin(), it));
+		const auto writeLocalFile = [&]() {
+			auto path = getFileFilePath(asset, fileIdx);
+			builder.append_key_value<"uri">(fg::normalizeAndFormatPath(path));
+			filePaths.emplace_back(path);
+			return Error::None;
+		};
+		const auto error = std::visit(visitor {
+			[&](auto&) {
+				// Covers BufferView, CustomBuffer, and Fallback, none of which are valid here.
+				return Error::InvalidGltf;
+			},
+			[&](const sources::Array&) { return writeLocalFile(); },
+			[&](const sources::Vector&) { return writeLocalFile(); },
+			[&](const sources::ByteView&) { return writeLocalFile(); },
+			[&](const sources::URI& uri) {
+				builder.append_key_value<"uri">(uri.uri->string());
+				filePaths.emplace_back(std::nullopt);
+				return Error::None;
+			},
+		}, it->data);
+		if (error != Error::None) [[unlikely]]
+			return error;
+
+		builder.append_comma();
+		builder.append_key_value<"mimeType">(it->mimeType);
+
+		if (extrasWriteCallback != nullptr) {
+			auto extras = extrasWriteCallback(fileIdx, Category::Files, userPointer);
+			if (extras.has_value()) {
+				builder.append_comma();
+				append_raw_key_value<"extras">(builder, *extras);
+			}
+		}
+
+		if (!it->name.empty()) {
+			builder.append_comma();
+			builder.append_key_value<"name">(it->name);
+		}
+	}
+
+	return Error::None;
 }
 
 fg::Error fg::Exporter::impl::writeImages(const Asset& asset, simdjson::builder::string_builder& builder) {
@@ -1544,6 +1650,10 @@ void fg::Exporter::impl::writeNodes(const Asset& asset, simdjson::builder::strin
 		if (it->skinIndex.has_value()) {
 			comma();
 			builder.append_key_value<"skin">(it->skinIndex.value());
+		}
+		if (it->externalAssetIndex.has_value()) {
+			comma();
+			builder.append_key_value<"externalAsset">(it->externalAssetIndex.value());
 		}
 
 		if (!it->children.empty()) {
@@ -2324,6 +2434,15 @@ fs::path fg::Exporter::impl::getImageFilePath(const Asset& asset, std::size_t in
 	return imageFolder / (std::string(imageName) + std::string(extension));
 }
 
+fs::path fg::Exporter::impl::getFileFilePath(const Asset& asset, std::size_t index) {
+	const auto& file = asset.files[index];
+	const auto extension = internal::getFileExtensionForMime(internal::getMimeTypeFromString(file.mimeType));
+	if (file.name.empty()) {
+		return fileFolder / ("file" + std::to_string(index) + std::string(extension));
+	}
+	return fileFolder / (file.name + std::string(extension));
+}
+
 fg::Expected<std::string> fg::Exporter::impl::writeJson(const Asset &asset) {
 	simdjson::builder::string_builder builder;
 
@@ -2382,6 +2501,15 @@ fg::Expected<std::string> fg::Exporter::impl::writeJson(const Asset &asset) {
 			builder.append_comma();
 			writeCameras(asset, builder);
 		}
+		if (!asset.externalAssets.empty()) {
+			builder.append_comma();
+			writeExternalAssets(asset, builder);
+		}
+		if (!asset.files.empty()) {
+			builder.append_comma();
+			if (const auto error = writeFiles(asset, builder); error != Error::None) [[unlikely]]
+				return error;
+		}
 		if (!asset.images.empty()) {
 			builder.append_comma();
 			if (const auto error = writeImages(asset, builder); error != Error::None) [[unlikely]]
@@ -2434,6 +2562,7 @@ fg::Expected<std::string> fg::Exporter::impl::writeJson(const Asset &asset) {
 fg::Expected<fg::ExportResult<std::string>> fg::Exporter::impl::writeGltfJson(const Asset& asset, ExportOptions _options) {
 	bufferPaths.clear();
 	imagePaths.clear();
+	filePaths.clear();
 	options = _options;
 	exportingBinary = false;
 
@@ -2453,12 +2582,14 @@ fg::Expected<fg::ExportResult<std::string>> fg::Exporter::impl::writeGltfJson(co
 	result.output = std::move(outputString.get());
 	result.bufferPaths = std::move(bufferPaths);
 	result.imagePaths = std::move(imagePaths);
+	result.filePaths = std::move(filePaths);
 	return result;
 }
 
 fg::Expected<fg::ExportResult<std::vector<std::byte>>> fg::Exporter::impl::writeGltfBinary(const Asset& asset, ExportOptions _options) {
 	bufferPaths.clear();
 	imagePaths.clear();
+	filePaths.clear();
 	options = _options;
 	exportingBinary = true;
 
@@ -2472,6 +2603,7 @@ fg::Expected<fg::ExportResult<std::vector<std::byte>>> fg::Exporter::impl::write
 
 	result.bufferPaths = std::move(bufferPaths);
 	result.imagePaths = std::move(imagePaths);
+	result.filePaths = std::move(filePaths);
 
 	// TODO: Add ExportOption enumeration for disabling this?
 	const bool withEmbeddedBuffer = !asset.buffers.empty() &&
@@ -2619,6 +2751,14 @@ namespace fastgltf {
 			auto& path = result.imagePaths[i];
 			if (path.has_value()) {
 				if (!writeFile(asset.images[i].data, baseFolder, path.value()))
+					return false;
+			}
+		}
+
+		for (std::size_t i = 0; i < asset.files.size(); ++i) {
+			auto& path = result.filePaths[i];
+			if (path.has_value()) {
+				if (!writeFile(asset.files[i].data, baseFolder, path.value()))
 					return false;
 			}
 		}

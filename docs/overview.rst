@@ -170,6 +170,29 @@ All the nodes, meshes, buffers, textures, ... can now be accessed through the ``
 References in between objects are done with a single ``std::size_t``, which is used to index into the
 various vectors in the asset.
 
+.. _gltf21:
+
+glTF 2.1 (draft) support
+========================
+
+**fastgltf** implements a subset of the `glTF 2.1 proposal <https://github.com/KhronosGroup/glTF/issues/2585>`_,
+which is still a draft and may change:
+
+- **Unified File References**: The top-level ``files`` array is parsed into ``Asset::files``.
+  Each ``fastgltf::File`` carries its required MIME type verbatim in ``File::mimeType`` and its
+  contents or URI in ``File::data``, just like buffers and images. Data URIs are always decoded;
+  external files are only read into memory when ``Options::LoadExternalFiles`` is specified,
+  mirroring ``Options::LoadExternalBuffers`` and ``Options::LoadExternalImages``.
+- **External Assets**: The top-level ``externalAssets`` array is parsed into
+  ``Asset::externalAssets``, and nodes that instantiate an external asset expose
+  ``Node::externalAssetIndex``. Note that **fastgltf** never recursively parses the referenced
+  glTF assets, and does not detect reference cycles across files; loading referenced assets
+  (with a separate ``Parser`` invocation) and guarding against cycles is the application's
+  responsibility.
+- **Multiple scene deprecation**: glTF 2.1 deprecates multiple scenes per asset; new content
+  should contain at most one scene. As the specification requires importers to stay backwards
+  compatible, **fastgltf** continues to parse, validate, and write multi-scene assets unchanged.
+
 .. _examples:
 
 Examples and real-world usage

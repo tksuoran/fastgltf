@@ -664,10 +664,12 @@ void fg::Parser::fillCategories(Category& inputCategories) noexcept {
 	if (hasBit(inputCategories, Category::Scenes))
 		inputCategories |= Category::Nodes;
 	if (hasBit(inputCategories, Category::Nodes))
-		inputCategories |= Category::Cameras | Category::Meshes | Category::Skins;
+		inputCategories |= Category::Cameras | Category::Meshes | Category::Skins | Category::ExternalAssets;
 	if (hasBit(inputCategories, Category::Skins))
 		// Skins needs nodes, nodes needs skins. To counter this circular dep we just redefine what we just wrote above.
-		inputCategories |= Category::Accessors | (Category::Nodes | Category::Cameras | Category::Meshes | Category::Skins);
+		inputCategories |= Category::Accessors | (Category::Nodes | Category::Cameras | Category::Meshes | Category::Skins | Category::ExternalAssets);
+	if (hasBit(inputCategories, Category::ExternalAssets))
+		inputCategories |= Category::Files;
 	if (hasBit(inputCategories, Category::Meshes))
 		inputCategories |= Category::Accessors | Category::Materials;
 	if (hasBit(inputCategories, Category::Materials))
@@ -911,6 +913,8 @@ fg::Expected<fg::Asset> fg::Parser::parse(internal::JsonObject& rootJson, Catego
 			KEY_SWITCH_CASE(Buffers, buffers)
 			KEY_SWITCH_CASE(BufferViews, bufferViews)
 			KEY_SWITCH_CASE(Cameras, cameras)
+			KEY_SWITCH_CASE(ExternalAssets, externalAssets)
+			KEY_SWITCH_CASE(Files, files)
 			KEY_SWITCH_CASE(Images, images)
 			KEY_SWITCH_CASE(Materials, materials)
 			KEY_SWITCH_CASE(Meshes, meshes)
@@ -1614,6 +1618,92 @@ fg::Error fg::Parser::parseImages(internal::JsonArray& imagesJson, Asset& asset)
 	return Error::None;
 }
 
+fg::Error fg::Parser::parseExternalAssets(internal::JsonArray& externalAssetsJson, Asset& asset) {
+	using namespace simdjson;
+	auto& externalAssets = externalAssetsJson.value;
+
+	if (const auto error = reserveElements(externalAssets, asset.externalAssets);
+		error != Error::None) [[unlikely]]
+		return error;
+
+	for (auto externalAssetValue : externalAssets) {
+		const auto extras = readExtras(config, asset.externalAssets.size(), Category::ExternalAssets);
+
+		auto& externalAsset = asset.externalAssets.emplace_back();
+
+		optional<std::size_t> fileIndex;
+		const auto error = externalAssetValue.get_object().for_each<"file", "name", "extras">(
+			fileIndex, externalAsset.name, extras);
+		if (error != SUCCESS) [[unlikely]]
+			return toError(error);
+
+		if (!fileIndex) [[unlikely]]
+			return Error::InvalidGltf;
+		externalAsset.fileIndex = *fileIndex;
+	}
+
+	return Error::None;
+}
+
+fg::Error fg::Parser::parseFiles(internal::JsonArray& filesJson, Asset& asset) {
+	using namespace simdjson;
+	auto& files = filesJson.value;
+
+	if (const auto error = reserveElements(files, asset.files); error != Error::None) [[unlikely]]
+		return error;
+
+	for (auto fileValue : files) {
+		const auto extras = readExtras(config, asset.files.size(), Category::Files);
+
+		auto& file = asset.files.emplace_back();
+
+		std::optional<std::string_view> uriString, mimeType;
+		const auto error = fileValue.get_object().for_each<"uri", "mimeType", "name", "extras">(
+			uriString, mimeType, file.name, extras);
+		if (error != SUCCESS) [[unlikely]]
+			return toError(error);
+
+		// Unlike buffers and images, both uri and mimeType are required for files.
+		if (!uriString || !mimeType) [[unlikely]]
+			return Error::InvalidGltf;
+		file.mimeType = *mimeType;
+
+		URIView uriView(*uriString);
+		if (!uriView.valid()) [[unlikely]]
+			return Error::InvalidURI;
+
+		if (uriView.isDataUri()) {
+			auto decoded = decodeDataUri(uriView);
+			if (decoded.has_error()) [[unlikely]]
+				return decoded.error();
+			file.data = std::move(decoded.get());
+		} else if (uriView.isLocalPath() && hasBit(options, Options::LoadExternalFiles)) {
+			auto loaded = loadFileFromUri(uriView);
+			if (loaded.has_error()) [[unlikely]]
+				return loaded.error();
+			file.data = std::move(loaded.get());
+		} else {
+			sources::URI filePath;
+			filePath.fileByteOffset = 0;
+			filePath.uri = uriView;
+			file.data = std::move(filePath);
+		}
+
+		if (std::holds_alternative<std::monostate>(file.data)) [[unlikely]]
+			return Error::InvalidGltf;
+
+		// The declared mimeType is authoritative; stamp it onto the data source too.
+		std::visit([&]<typename T>(T& arg) {
+			if constexpr (is_any_of_v<T, sources::CustomBuffer, sources::BufferView,
+					sources::URI, sources::Array, sources::Vector>) {
+				arg.mimeType = internal::getMimeTypeFromString(*mimeType);
+			}
+		}, file.data);
+	}
+
+	return Error::None;
+}
+
 fg::Error fg::Parser::parseLights(internal::JsonArray& lightsJson, Asset& asset) {
 	using namespace simdjson;
 	auto& lights = lightsJson.value;
@@ -2119,10 +2209,10 @@ fg::Error fg::Parser::parseNodes(internal::JsonArray& nodesJson, Asset& asset) {
 		const auto error = nodeValue.get_object().for_each<
 			"camera", "children", "skin", "matrix",
 			"mesh", "rotation", "scale", "translation",
-			"weights", "name", "extensions", "extras">(
+			"weights", "name", "externalAsset", "extensions", "extras">(
 			node.cameraIndex, node.children, node.skinIndex, matrix,
 			node.meshIndex, trs.rotation, trs.scale, trs.translation,
-			node.weights, node.name, readExtensions, extras);
+			node.weights, node.name, node.externalAssetIndex, readExtensions, extras);
 		if (error != SUCCESS) [[unlikely]]
 			return toError(error);
 

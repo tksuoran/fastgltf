@@ -194,6 +194,8 @@ namespace fastgltf {
 		OctetStream = 6,
 		WEBP = 7,
 		AVIF = 8,
+		GltfJson = 9,
+		GltfBinary = 10,
 	};
 
 	FASTGLTF_EXPORT enum class AnimationInterpolation : std::uint8_t {
@@ -278,6 +280,8 @@ namespace fastgltf {
 		PhysicsMaterials	= 1 << 15,
 		CollisionFilters	= 1 << 16,
 		PhysicsJoints		= 1 << 17,
+		Files               = 1 << 18,
+		ExternalAssets      = 1 << 19,
 
 		All = ~0u,
 
@@ -454,6 +458,8 @@ namespace fastgltf {
 		inline constexpr std::string_view mimeTypeOctetStream = "application/octet-stream";
 		inline constexpr std::string_view mimeTypeWebp = "image/webp";
 		inline constexpr std::string_view mimeTypeAvif = "image/avif";
+		inline constexpr std::string_view mimeTypeGltfJson = "model/gltf+json";
+		inline constexpr std::string_view mimeTypeGltfBinary = "model/gltf-binary";
 
 		[[nodiscard]] constexpr std::string_view getMimeTypeString(const MimeType mimeType) noexcept {
 			switch (mimeType) {
@@ -473,6 +479,10 @@ namespace fastgltf {
 					return mimeTypeWebp;
 				case MimeType::AVIF:
 					return mimeTypeAvif;
+				case MimeType::GltfJson:
+					return mimeTypeGltfJson;
+				case MimeType::GltfBinary:
+					return mimeTypeGltfBinary;
 				default:
 					return "";
 			}
@@ -503,6 +513,12 @@ namespace fastgltf {
 				case force_consteval<crc32c(mimeTypeAvif)>: {
 					return MimeType::AVIF;
 				}
+				case force_consteval<crc32c(mimeTypeGltfJson)>: {
+					return MimeType::GltfJson;
+				}
+				case force_consteval<crc32c(mimeTypeGltfBinary)>: {
+					return MimeType::GltfBinary;
+				}
 				default: {
 					return MimeType::None;
 				}
@@ -522,6 +538,10 @@ namespace fastgltf {
 					return ".webp";
 				case MimeType::AVIF:
 					return ".avif";
+				case MimeType::GltfJson:
+					return ".gltf";
+				case MimeType::GltfBinary:
+					return ".glb";
 				default:
 				case MimeType::None:
 				case MimeType::GltfBuffer:
@@ -1210,6 +1230,12 @@ namespace fastgltf {
 		 */
 		optional<std::size_t> lightIndex;
 
+		/**
+		 * Index into Asset::externalAssets. When set, this node instantiates the referenced
+		 * external glTF asset at this point in the scene hierarchy (glTF 2.1).
+		 */
+		optional<std::size_t> externalAssetIndex;
+
 		std::vector<std::size_t> children;
 		std::vector<num> weights;
 
@@ -1729,6 +1755,38 @@ namespace fastgltf {
 		std::string name;
 	};
 
+	/**
+	 * An entry of the top-level "files" array introduced with glTF 2.1, which unifies how
+	 * external, embedded, and packaged resources of any type are referenced.
+	 */
+	FASTGLTF_EXPORT struct File {
+		DataSource data;
+
+		/**
+		 * The MIME type declared in the asset, stored verbatim. Unlike buffers and images this
+		 * is required, and may be any MIME type, which is why this is not a MimeType enum value.
+		 * The data source's mimeType is additionally set when the string is a known MimeType.
+		 */
+		std::string mimeType;
+
+		std::string name;
+	};
+
+	/**
+	 * An entry of the top-level "externalAssets" array introduced with glTF 2.1. References a
+	 * glTF asset through the Asset::files array, which nodes can instantiate through
+	 * Node::externalAssetIndex. fastgltf does not load or parse the referenced asset itself,
+	 * and does not detect cross-file reference cycles; both are the application's responsibility.
+	 */
+	FASTGLTF_EXPORT struct ExternalAsset {
+		/**
+		 * Index into Asset::files, pointing at the referenced glTF file.
+		 */
+		std::size_t fileIndex;
+
+		std::string name;
+	};
+
 	FASTGLTF_EXPORT struct Light {
 		LightType type;
 		/** RGB light color in linear space. */
@@ -1763,6 +1821,8 @@ namespace fastgltf {
 		std::vector<BufferView> bufferViews;
 		std::vector<CollisionFilter> collisionFilters;
 		std::vector<Camera> cameras;
+		std::vector<ExternalAsset> externalAssets;
+		std::vector<File> files;
 		std::vector<Image> images;
 		std::vector<Light> lights;
 		std::vector<Material> materials;

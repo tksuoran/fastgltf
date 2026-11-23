@@ -72,6 +72,7 @@ namespace fastgltf {
 
 		std::vector<std::optional<std::filesystem::path>> bufferPaths;
 		std::vector<std::optional<std::filesystem::path>> imagePaths;
+		std::vector<std::optional<std::filesystem::path>> filePaths;
 	};
 
 	/**
@@ -89,6 +90,7 @@ namespace fastgltf {
 	protected:
 		std::span<std::optional<std::filesystem::path>> getBufferPaths();
 		std::span<std::optional<std::filesystem::path>> getImagePaths();
+		std::span<std::optional<std::filesystem::path>> getFilePaths();
 
 	public:
 		explicit Exporter();
@@ -106,6 +108,12 @@ namespace fastgltf {
 		 * If folder.is_relative() returns false, this has no effect.
 		 */
 		void setImagePath(std::filesystem::path folder);
+		/**
+		 * Sets the relative base path for URIs of glTF 2.1 "files" array entries.
+		 *
+		 * If folder.is_relative() returns false, this has no effect.
+		 */
+		void setFilePath(std::filesystem::path folder);
 
 		void setExtrasWriteCallback(ExtrasWriteCallback* callback) noexcept;
 

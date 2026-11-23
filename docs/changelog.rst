@@ -6,6 +6,14 @@ Changelog
 
 To view the full changelogs for each release please see the `GitHub releases <https://github.com/spnda/fastgltf/releases>`_.
 
+Unreleased
+==========
+
+- Add: Support for a subset of the glTF 2.1 proposal (`KhronosGroup/glTF#2585 <https://github.com/KhronosGroup/glTF/issues/2585>`_)
+    - The top-level ``files`` array (Unified File References) is parsed into ``Asset::files``, and the ``externalAssets`` array (External Assets) into ``Asset::externalAssets``; nodes expose ``Node::externalAssetIndex``. Both arrays are also written by the exporter, and ``FileExporter`` writes loaded file entries to disk.
+    - ``Options::LoadExternalFiles`` eagerly loads externally referenced files, mirroring ``Options::LoadExternalBuffers``. fastgltf never recursively parses referenced glTF assets and does not detect cross-file reference cycles; both are left to the application.
+    - Multiple scenes per asset are deprecated with glTF 2.1. fastgltf keeps parsing, validating, and writing them unchanged, as the specification requires importers to remain backwards compatible.
+
 1.0.1
 =====
 
