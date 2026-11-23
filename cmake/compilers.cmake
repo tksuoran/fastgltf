@@ -33,6 +33,18 @@ macro(fastgltf_compiler_flags TARGET)
     endif()
 endmacro()
 
+# Silences warnings when compiling downloaded third-party sources, which fastgltf_compiler_flags
+# enables for fastgltf's own code.
+macro(fastgltf_third_party_flags TARGET)
+    if (NOT ${TARGET} STREQUAL "" AND TARGET ${TARGET})
+        if (MSVC)
+            target_compile_options(${TARGET} PRIVATE /W0)
+        else()
+            target_compile_options(${TARGET} PRIVATE -w)
+        endif()
+    endif()
+endmacro()
+
 macro(fastgltf_enable_debug_inlining TARGET)
     if (NOT ${TARGET} STREQUAL "" AND TARGET ${TARGET})
         if (MSVC)

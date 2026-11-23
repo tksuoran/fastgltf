@@ -90,7 +90,9 @@ else()
         # create a static library for simdjson in the fastgltf "namespace"
         add_library(fastgltf_simdjson STATIC "${FASTGLTF_SIMDJSON_DL_DIR}/simdjson.cpp")
         fastgltf_compiler_flags(fastgltf_simdjson)
-        target_include_directories(fastgltf_simdjson PUBLIC
+        fastgltf_third_party_flags(fastgltf_simdjson)
+        # SYSTEM, so that fastgltf's warning flags don't apply to the third-party headers.
+        target_include_directories(fastgltf_simdjson SYSTEM PUBLIC
                 $<BUILD_INTERFACE:${FASTGLTF_SIMDJSON_DL_DIR}>
                 $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}/fastgltf/simdjson>)
         target_compile_features(fastgltf_simdjson PUBLIC ${FASTGLTF_COMPILE_TARGET})
@@ -126,7 +128,9 @@ else()
 
         add_library(fastgltf_simdutf STATIC "${FASTGLTF_SIMDUTF_DL_DIR}/simdutf.cpp")
         fastgltf_compiler_flags(fastgltf_simdutf)
-        target_include_directories(fastgltf_simdutf PUBLIC
+        fastgltf_third_party_flags(fastgltf_simdutf)
+        # SYSTEM, so that fastgltf's warning flags don't apply to the third-party headers.
+        target_include_directories(fastgltf_simdutf SYSTEM PUBLIC
                 $<BUILD_INTERFACE:${FASTGLTF_SIMDUTF_DL_DIR}>
                 $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}/fastgltf/simdutf>)
         target_compile_features(fastgltf_simdutf PUBLIC ${FASTGLTF_COMPILE_TARGET})
