@@ -509,6 +509,46 @@ namespace fastgltf {
 			return simdjson::SUCCESS;
 		};
 	}
+
+	/**
+	 * Passes the raw JSON of an "extensions" object to the extensions callback, and then hands the
+	 * rewound object to the handler for the extensions fastgltf parses itself.
+	 */
+	[[nodiscard]] inline simdjson::error_code passExtensions(const ParserInternalConfig& config,
+			simdjson::ondemand::object& object, const std::size_t objectIndex,
+			const std::size_t subObjectIndex, const Category category) {
+		if (config.extensionsCallback == nullptr)
+			return simdjson::SUCCESS;
+
+		std::string_view extensions;
+		if (const auto error = object.raw_json().get(extensions); error != simdjson::SUCCESS) [[unlikely]]
+			return error;
+		config.extensionsCallback(extensions, objectIndex, subObjectIndex, category, config.userPointer);
+		return object.reset().error();
+	}
+
+	template <typename F>
+	[[nodiscard]] inline auto readExtensions(const ParserInternalConfig& config,
+			const std::size_t objectIndex, const std::size_t subObjectIndex,
+			const Category category, F&& typedExtensions) {
+		return [&config, objectIndex, subObjectIndex, category,
+				typedExtensions = std::forward<F>(typedExtensions)](simdjson::ondemand::value value) -> simdjson::error_code {
+			simdjson::ondemand::object object;
+			if (const auto error = value.get_object().get(object); error != simdjson::SUCCESS) [[unlikely]]
+				return error;
+			if (const auto error = passExtensions(config, object, objectIndex, subObjectIndex, category);
+				error != simdjson::SUCCESS) [[unlikely]]
+				return error;
+			return typedExtensions(object);
+		};
+	}
+
+	/** readExtensions for objects which have no extensions fastgltf parses itself. */
+	[[nodiscard]] inline auto readExtensions(const ParserInternalConfig& config,
+			const std::size_t objectIndex, const std::size_t subObjectIndex, const Category category) {
+		return readExtensions(config, objectIndex, subObjectIndex, category,
+			[](simdjson::ondemand::object&) { return simdjson::SUCCESS; });
+	}
 } // namespace fastgltf
 
 namespace simdjson {
@@ -881,6 +921,9 @@ fg::Expected<fg::Asset> fg::Parser::parse(internal::JsonObject& rootJson, Catego
 			if (object.value().get_object().get(extensionsObject.value) != SUCCESS) [[unlikely]] {
 				return Error::InvalidGltf;
 			}
+			if (const auto error = passExtensions(config, extensionsObject.value, 0,
+				invalidSubObjectIndex, Category::Asset); error != SUCCESS) [[unlikely]]
+				return toError(error);
 
 			if (const auto error = parseExtensions(extensionsObject, asset);
 				error != Error::None) [[unlikely]]
@@ -1441,8 +1484,10 @@ fg::Error fg::Parser::parseCameras(internal::JsonArray& camerasJson, Asset& asse
 		std::optional<Camera::Orthographic> orthographic;
 
 		const auto error = cameraValue.get_object().for_each<
-			"type", "perspective", "orthographic", "name", "extras">(
-			type, perspective, orthographic, camera.name, extras);
+			"type", "perspective", "orthographic", "name", "extensions", "extras">(
+			type, perspective, orthographic, camera.name,
+			readExtensions(config, asset.cameras.size() - 1, invalidSubObjectIndex, Category::Cameras),
+			extras);
 		if (error != SUCCESS) [[unlikely]]
 			return toError(error);
 
@@ -1970,12 +2015,11 @@ fg::Error fg::Parser::parseMaterials(internal::JsonArray& materialsJson, Asset& 
 				pbr.roughnessFactor, readTexture(pbr.metallicRoughnessTexture));
 		};
 
-		const auto readExtensions = [&](ondemand::value value) -> error_code {
-			internal::JsonObject extensions;
-			if (const auto error = value.get(extensions.value); error != SUCCESS) [[unlikely]]
-				return error;
+		const auto readMaterialExtensions = readExtensions(config, asset.materials.size() - 1,
+				invalidSubObjectIndex, Category::Materials, [&](ondemand::object& object) -> error_code {
+			internal::JsonObject extensions { object };
 			return toErrorCode(parseMaterialExtensions(extensions, material));
-		};
+		});
 
 		const auto error = materialValue.get_object().for_each<
 			"name", "pbrMetallicRoughness",
@@ -1987,7 +2031,7 @@ fg::Error fg::Parser::parseMaterials(internal::JsonArray& materialsJson, Asset& 
 			readTexture(material.normalTexture), readTexture(material.occlusionTexture),
 			readTexture(material.emissiveTexture), material.emissiveFactor,
 			material.alphaMode, material.alphaCutoff, material.doubleSided,
-			readExtensions, extras);
+			readMaterialExtensions, extras);
 		if (error != SUCCESS) [[unlikely]]
 			return toError(error);
 	}
@@ -2062,7 +2106,7 @@ fg::Error fg::Parser::parsePrimitiveExtensions(internal::JsonObject& objectJson,
 		readVariants, readDraco));
 }
 
-fg::Error fg::Parser::parsePrimitives(internal::JsonArray& meshesJson, Mesh& mesh) {
+fg::Error fg::Parser::parsePrimitives(internal::JsonArray& meshesJson, Mesh& mesh, const std::size_t meshIndex) {
 	using namespace simdjson;
 	auto& primitives = meshesJson.value;
 
@@ -2070,14 +2114,14 @@ fg::Error fg::Parser::parsePrimitives(internal::JsonArray& meshesJson, Mesh& mes
 		return error;
 
 	for (auto value : primitives) {
+		const auto primitiveIndex = mesh.primitives.size();
 		auto& primitive = mesh.primitives.emplace_back();
 
-		const auto readExtensions = [&](ondemand::value extensionsValue) -> error_code {
-			internal::JsonObject extensions;
-			if (const auto error = extensionsValue.get(extensions.value); error != SUCCESS) [[unlikely]]
-				return error;
+		const auto readPrimitiveExtensions = readExtensions(config, meshIndex, primitiveIndex,
+				Category::Meshes, [&](ondemand::object& object) -> error_code {
+			internal::JsonObject extensions { object };
 			return toErrorCode(parsePrimitiveExtensions(extensions, primitive));
-		};
+		});
 
 		// The attributes are required, but may be empty.
 		bool hasAttributes = false;
@@ -2090,7 +2134,7 @@ fg::Error fg::Parser::parsePrimitives(internal::JsonArray& meshesJson, Mesh& mes
 			"attributes", "indices", "material",
 			"mode", "targets", "extensions">(
 			readAttributes, primitive.indicesAccessor, primitive.materialIndex,
-			primitive.type, primitive.targets, readExtensions);
+			primitive.type, primitive.targets, readPrimitiveExtensions);
 		if (error != SUCCESS) [[unlikely]]
 			return toError(error);
 
@@ -2113,16 +2157,19 @@ fg::Error fg::Parser::parseMeshes(internal::JsonArray& meshesJson, Asset& asset)
 
 		auto& mesh = asset.meshes.emplace_back();
 
+		const auto meshIndex = asset.meshes.size() - 1;
 		const auto readPrimitives = [&](ondemand::value primitivesValue) {
 			internal::JsonArray primitives;
 			if (const auto error = primitivesValue.get(primitives.value); error != SUCCESS) [[unlikely]]
 				return error;
-			return toErrorCode(parsePrimitives(primitives, mesh));
+			return toErrorCode(parsePrimitives(primitives, mesh, meshIndex));
 		};
 
 		const auto error = meshValue.get_object().for_each<
-			"primitives", "weights", "name", "extras">(
-			readPrimitives, mesh.weights, mesh.name, extras);
+			"primitives", "weights", "name", "extensions", "extras">(
+			readPrimitives, mesh.weights, mesh.name,
+			readExtensions(config, meshIndex, invalidSubObjectIndex, Category::Meshes),
+			extras);
 		if (error != SUCCESS) [[unlikely]]
 			return toError(error);
 
@@ -2138,7 +2185,7 @@ fg::Error fg::Parser::parseNodes(internal::JsonArray& nodesJson, Asset& asset) {
 	using namespace simdjson;
 	auto& nodes = nodesJson.value;
 
-	const auto parseNodeExtensions = [&](ondemand::value value, Node& node) -> error_code {
+	const auto parseNodeExtensions = [&](ondemand::object& object, Node& node) -> error_code {
 		const auto readLight = [&](ondemand::value lights) -> error_code {
 			if (!hasBit(config.extensions, Extensions::KHR_lights_punctual))
 				return SUCCESS;
@@ -2184,7 +2231,7 @@ fg::Error fg::Parser::parseNodes(internal::JsonArray& nodesJson, Asset& asset) {
 			return hoverability.get_object().for_each<"hoverable">(node.hoverable);
 		};
 
-		return value.get_object().for_each<
+		return object.for_each<
 			"KHR_lights_punctual", "EXT_mesh_gpu_instancing", "KHR_physics_rigid_bodies",
 			"KHR_node_visibility", "KHR_node_selectability", "KHR_node_hoverability">(
 			readLight, readInstancing, readRigidBodies,
@@ -2202,9 +2249,10 @@ fg::Error fg::Parser::parseNodes(internal::JsonArray& nodesJson, Asset& asset) {
 		std::optional<math::nmat4x4> matrix;
 		TRS trs {};
 
-		const auto readExtensions = [&](ondemand::value extensions) {
-			return parseNodeExtensions(extensions, node);
-		};
+		const auto readNodeExtensions = readExtensions(config, asset.nodes.size() - 1,
+				invalidSubObjectIndex, Category::Nodes, [&](ondemand::object& object) {
+			return parseNodeExtensions(object, node);
+		});
 
 		const auto error = nodeValue.get_object().for_each<
 			"camera", "children", "skin", "matrix",
@@ -2212,7 +2260,7 @@ fg::Error fg::Parser::parseNodes(internal::JsonArray& nodesJson, Asset& asset) {
 			"weights", "name", "externalAsset", "extensions", "extras">(
 			node.cameraIndex, node.children, node.skinIndex, matrix,
 			node.meshIndex, trs.rotation, trs.scale, trs.translation,
-			node.weights, node.name, node.externalAssetIndex, readExtensions, extras);
+			node.weights, node.name, node.externalAssetIndex, readNodeExtensions, extras);
 		if (error != SUCCESS) [[unlikely]]
 			return toError(error);
 
@@ -2270,8 +2318,10 @@ fg::Error fg::Parser::parseScenes(internal::JsonArray& scenesJson, Asset& asset)
 		// The scene object can be completely empty
 		auto& scene = asset.scenes.emplace_back();
 
-		const auto error = sceneValue.get_object().for_each<"nodes", "name", "extras">(
-			scene.nodeIndices, scene.name, extras);
+		const auto error = sceneValue.get_object().for_each<"nodes", "name", "extensions", "extras">(
+			scene.nodeIndices, scene.name,
+			readExtensions(config, asset.scenes.size() - 1, invalidSubObjectIndex, Category::Scenes),
+			extras);
 		if (error != SUCCESS) [[unlikely]]
 			return toError(error);
 	}
@@ -2854,6 +2904,10 @@ void fg::Parser::setBufferAllocationCallback(BufferMapCallback* mapCallback, Buf
 
 void fg::Parser::setExtrasParseCallback(ExtrasParseCallback *extrasCallback) noexcept {
 	config.extrasCallback = extrasCallback;
+}
+
+void fg::Parser::setExtensionsParseCallback(ExtensionsParseCallback* extensionsCallback) noexcept {
+	config.extensionsCallback = extensionsCallback;
 }
 
 void fg::Parser::setUserPointer(void* pointer) noexcept {

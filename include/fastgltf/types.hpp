@@ -297,6 +297,14 @@ namespace fastgltf {
 	FASTGLTF_UNARY_OP_TEMPLATE_MACRO(Category, ~)
 	// clang-format on
 
+	/**
+	 * subObjectIndex value passed to the generic extensions callbacks for every object that is not
+	 * a mesh primitive. For mesh primitives (Category::Meshes) subObjectIndex is the primitive
+	 * index within the mesh while objectIndex is the mesh index; a Category::Meshes invocation
+	 * with invalidSubObjectIndex refers to the mesh object itself.
+	 */
+	FASTGLTF_EXPORT inline constexpr std::size_t invalidSubObjectIndex = ~static_cast<std::size_t>(0);
+
 	FASTGLTF_EXPORT enum class CombineMode : std::uint8_t {
 		Average,
 		Minimum,

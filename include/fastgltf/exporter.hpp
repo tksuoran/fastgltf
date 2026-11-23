@@ -62,6 +62,17 @@ namespace fastgltf {
 	FASTGLTF_EXPORT using ExtrasWriteCallback = std::optional<std::string>(std::size_t objectIndex, Category objectType, void* userPointer);
 
 	/**
+	 * Generic extension passthrough, write side: invoked once per written object; the returned
+	 * string is spliced verbatim into the object's "extensions" object as one or more members,
+	 * e.g. R"("VENDOR_ext":{"value":1})" (multiple members comma-separated, without surrounding
+	 * braces). Return std::nullopt (or an empty string) to write nothing. The application is
+	 * responsible for adding the extension names it writes to Asset::extensionsUsed. Invoked for
+	 * the same objects as ExtensionsParseCallback: the asset root (Category::Asset), scenes,
+	 * nodes, cameras, materials, meshes, and mesh primitives (see invalidSubObjectIndex).
+	 */
+	FASTGLTF_EXPORT using ExtensionsWriteCallback = std::optional<std::string>(std::size_t objectIndex, std::size_t subObjectIndex, Category objectType, void* userPointer);
+
+	/**
 	 * This converts a compacted JSON string into a more readable pretty format.
 	 */
 	void prettyPrintJson(std::string& json);
@@ -116,6 +127,8 @@ namespace fastgltf {
 		void setFilePath(std::filesystem::path folder);
 
 		void setExtrasWriteCallback(ExtrasWriteCallback* callback) noexcept;
+
+		void setExtensionsWriteCallback(ExtensionsWriteCallback* callback) noexcept;
 
 		void setUserPointer(void* pointer) noexcept;
 

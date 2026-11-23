@@ -65,6 +65,7 @@ struct fastgltf::Exporter::impl {
 
 	void* userPointer = nullptr;
 	ExtrasWriteCallback* extrasWriteCallback = nullptr;
+	ExtensionsWriteCallback* extensionsWriteCallback = nullptr;
 
 	std::vector<std::optional<std::filesystem::path>> bufferPaths;
 	std::vector<std::optional<std::filesystem::path>> imagePaths;
@@ -74,7 +75,33 @@ struct fastgltf::Exporter::impl {
 	void setImagePath(std::filesystem::path folder);
 	void setFilePath(std::filesystem::path folder);
 	void setExtrasWriteCallback(ExtrasWriteCallback* callback) noexcept;
+	void setExtensionsWriteCallback(ExtensionsWriteCallback* callback) noexcept;
 	void setUserPointer(void* pointer) noexcept;
+
+	/** Returns the members the extensions write callback provides for an object, if any. */
+	std::optional<std::string> getGenericExtensions(std::size_t objectIndex, std::size_t subObjectIndex, Category category) const {
+		if (extensionsWriteCallback == nullptr)
+			return std::nullopt;
+		auto extensions = extensionsWriteCallback(objectIndex, subObjectIndex, category, userPointer);
+		if (extensions.has_value() && extensions->empty())
+			return std::nullopt;
+		return extensions;
+	}
+
+	/** Writes a complete "extensions" object holding only the members from the extensions write callback. */
+	template <typename Comma>
+	void writeGenericExtensions(simdjson::builder::string_builder& builder, Comma&& comma,
+			std::size_t objectIndex, std::size_t subObjectIndex, Category category) const {
+		auto extensions = getGenericExtensions(objectIndex, subObjectIndex, category);
+		if (!extensions.has_value())
+			return;
+		comma();
+		builder.escape_and_append_with_quotes<"extensions">();
+		builder.append_colon();
+		builder.start_object();
+		builder.append_raw(*extensions);
+		builder.end_object();
+	}
 
 	void writeAccessors(const Asset& asset, simdjson::builder::string_builder& builder);
 	void writeAnimations(const Asset& asset, simdjson::builder::string_builder& builder);
@@ -86,7 +113,7 @@ struct fastgltf::Exporter::impl {
 	Error writeFiles(const Asset& asset, simdjson::builder::string_builder& builder);
 	Error writeImages(const Asset& asset, simdjson::builder::string_builder& builder);
 	void writeLights(const Asset& asset, simdjson::builder::string_builder& builder);
-	void writeMaterialExtensions(const Material& material, simdjson::builder::string_builder& builder);
+	void writeMaterialExtensions(const Material& material, const std::optional<std::string>& genericExtensions, simdjson::builder::string_builder& builder);
 	void writeMaterials(const Asset& asset, simdjson::builder::string_builder& builder);
 	void writeMeshes(const Asset& asset, simdjson::builder::string_builder& builder);
 	void writeNodes(const Asset& asset, simdjson::builder::string_builder& builder);
@@ -139,6 +166,10 @@ namespace fastgltf {
 
 	void fg::Exporter::setExtrasWriteCallback(ExtrasWriteCallback* callback) noexcept {
 		_impl->setExtrasWriteCallback(callback);
+	}
+
+	void fg::Exporter::setExtensionsWriteCallback(ExtensionsWriteCallback* callback) noexcept {
+		_impl->setExtensionsWriteCallback(callback);
 	}
 
 	void fg::Exporter::setUserPointer(void* pointer) noexcept {
@@ -404,6 +435,10 @@ void fg::Exporter::impl::setFilePath(fs::path folder) {
 
 void fg::Exporter::impl::setExtrasWriteCallback(ExtrasWriteCallback *callback) noexcept {
 	extrasWriteCallback = callback;
+}
+
+void fg::Exporter::impl::setExtensionsWriteCallback(ExtensionsWriteCallback* callback) noexcept {
+	extensionsWriteCallback = callback;
 }
 
 void fg::Exporter::impl::setUserPointer(void* pointer) noexcept {
@@ -833,6 +868,9 @@ void fg::Exporter::impl::writeCameras(const Asset& asset, simdjson::builder::str
 			}
 		}, it->camera);
 
+		writeGenericExtensions(builder, [&] { builder.append_comma(); },
+			uabs(std::distance(asset.cameras.begin(), it)), invalidSubObjectIndex, Category::Cameras);
+
 		if (extrasWriteCallback != nullptr) {
 			auto extras = extrasWriteCallback(uabs(std::distance(asset.cameras.begin(), it)), Category::Cameras, userPointer);
 			if (extras.has_value()) {
@@ -1073,10 +1111,15 @@ void fg::Exporter::impl::writeLights(const Asset& asset, simdjson::builder::stri
 	}
 }
 
-void fg::Exporter::impl::writeMaterialExtensions(const Material &material, simdjson::builder::string_builder &builder) {
+void fg::Exporter::impl::writeMaterialExtensions(const Material &material, const std::optional<std::string>& genericExtensions, simdjson::builder::string_builder &builder) {
 	auto obj = scoped_object<"extensions">(builder);
 
 	comma_separator extensions_comma { builder };
+
+	if (genericExtensions.has_value()) {
+		extensions_comma();
+		builder.append_raw(*genericExtensions);
+	}
 
 	if (material.anisotropy) {
 		extensions_comma();
@@ -1471,7 +1514,8 @@ void fg::Exporter::impl::writeMaterials(const Asset& asset, simdjson::builder::s
 		}
 
 		builder.append_comma();
-		writeMaterialExtensions(*it, builder);
+		writeMaterialExtensions(*it, getGenericExtensions(uabs(std::distance(asset.materials.begin(), it)),
+			invalidSubObjectIndex, Category::Materials), builder);
 
 		if (extrasWriteCallback != nullptr) {
 			auto extras = extrasWriteCallback(uabs(std::distance(asset.materials.begin(), it)), Category::Materials, userPointer);
@@ -1556,12 +1600,20 @@ void fg::Exporter::impl::writeMeshes(const Asset& asset, simdjson::builder::stri
 					builder.append_key_value<"mode">(to_underlying(itp->type));
 				}
 
-				const bool hasExtensions = !itp->mappings.empty() || itp->dracoCompression;
+				const auto genericExtensions = getGenericExtensions(
+					uabs(std::distance(asset.meshes.begin(), it)),
+					uabs(std::distance(it->primitives.begin(), itp)), Category::Meshes);
+				const bool hasExtensions = !itp->mappings.empty() || itp->dracoCompression || genericExtensions;
 				if (hasExtensions) {
 					builder.append_comma();
 					builder.escape_and_append_with_quotes<"extensions">();
 					builder.append_colon();
 					builder.start_object();
+				}
+				if (genericExtensions.has_value()) {
+					builder.append_raw(*genericExtensions);
+					if (!itp->mappings.empty() || itp->dracoCompression)
+						builder.append_comma();
 				}
 				if (!itp->mappings.empty()) {
 					auto variants_obj = scoped_object<"KHR_materials_variants">(builder);
@@ -1609,6 +1661,9 @@ void fg::Exporter::impl::writeMeshes(const Asset& asset, simdjson::builder::stri
 			comma();
 			append_key_range<"weights">(builder, it->weights);
 		}
+
+		writeGenericExtensions(builder, comma,
+			uabs(std::distance(asset.meshes.begin(), it)), invalidSubObjectIndex, Category::Meshes);
 
 		if (extrasWriteCallback != nullptr) {
 			auto extras = extrasWriteCallback(uabs(std::distance(asset.meshes.begin(), it)), Category::Meshes, userPointer);
@@ -1697,14 +1752,21 @@ void fg::Exporter::impl::writeNodes(const Asset& asset, simdjson::builder::strin
 			},
 		}, it->transform);
 
+		const auto genericExtensions = getGenericExtensions(
+			uabs(std::distance(asset.nodes.begin(), it)), invalidSubObjectIndex, Category::Nodes);
 		if (!it->instancingAttributes.empty() || it->lightIndex.has_value() ||
 			it->physicsRigidBody ||
-			!it->visible || !it->selectable || !it->hoverable) {
+			!it->visible || !it->selectable || !it->hoverable || genericExtensions) {
 			comma();
 
 			auto extensions_obj = scoped_object<"extensions">(builder);
 
 			comma_separator extensionComma { builder };
+
+			if (genericExtensions.has_value()) {
+				extensionComma();
+				builder.append_raw(*genericExtensions);
+			}
 
 			if (!it->instancingAttributes.empty()) {
 				extensionComma();
@@ -1947,6 +2009,9 @@ void fg::Exporter::impl::writeScenes(const Asset& asset, simdjson::builder::stri
 			comma();
 			append_key_range<"nodes">(builder, it->nodeIndices);
 		}
+
+		writeGenericExtensions(builder, comma,
+			uabs(std::distance(asset.scenes.begin(), it)), invalidSubObjectIndex, Category::Scenes);
 
 		if (extrasWriteCallback != nullptr) {
 			auto extras = extrasWriteCallback(uabs(std::distance(asset.scenes.begin(), it)), Category::Scenes, userPointer);
@@ -2371,6 +2436,11 @@ void fg::Exporter::impl::writeExtensions(const Asset& asset, simdjson::builder::
 	auto extensions = scoped_object<"extensions">(builder);
 
 	comma_separator comma { builder };
+
+	if (auto genericExtensions = getGenericExtensions(0, invalidSubObjectIndex, Category::Asset)) {
+		comma();
+		builder.append_raw(*genericExtensions);
+	}
 
 	if (!asset.lights.empty()) {
 		comma();

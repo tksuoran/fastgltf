@@ -384,6 +384,17 @@ namespace fastgltf {
 	FASTGLTF_EXPORT using ExtrasParseCallback = void(std::string_view extras, std::size_t objectIndex, Category objectType, void* userPointer);
 
 	/**
+	 * Generic extension passthrough, read side: invoked once per parsed object that has an
+	 * "extensions" member, with the raw JSON of the whole extensions object. The application picks
+	 * the extension names it understands (e.g. its own vendor extensions) and ignores the rest;
+	 * extensions fastgltf supports are still parsed into the typed fields as usual. Invoked for:
+	 * the asset root (Category::Asset, objectIndex 0), scenes, nodes, cameras, materials, meshes,
+	 * and mesh primitives (see invalidSubObjectIndex). Like ExtrasParseCallback, objectIndex is
+	 * the index the object will have in its Asset vector.
+	 */
+	FASTGLTF_EXPORT using ExtensionsParseCallback = void(std::string_view extensions, std::size_t objectIndex, std::size_t subObjectIndex, Category objectType, void* userPointer);
+
+	/**
 	 * This interface defines how the parser can read the bytes making up a glTF or GLB file.
 	 */
 	FASTGLTF_EXPORT class GltfDataGetter {
@@ -656,6 +667,7 @@ namespace fastgltf {
 		BufferMapCallback* mapCallback = nullptr;
 		BufferUnmapCallback* unmapCallback = nullptr;
 		ExtrasParseCallback* extrasCallback = nullptr;
+		ExtensionsParseCallback* extensionsCallback = nullptr;
 
 		void* userPointer = nullptr;
 		Extensions extensions = Extensions::None;
@@ -702,7 +714,7 @@ namespace fastgltf {
 		Error parseMaterialExtensions(internal::JsonObject& object, Material& material);
 		Error parseMaterials(internal::JsonArray& array, Asset& asset);
 		Error parsePrimitiveExtensions(internal::JsonObject& object, Primitive& primitive);
-		Error parsePrimitives(internal::JsonArray& array, Mesh& mesh);
+		Error parsePrimitives(internal::JsonArray& array, Mesh& mesh, std::size_t meshIndex);
 		Error parseMeshes(internal::JsonArray& array, Asset& asset);
 		Error parseNodes(internal::JsonArray& array, Asset& asset);
 		Error parsePhysicsMaterials(internal::JsonArray& physicsMaterials, Asset& asset);
@@ -769,6 +781,8 @@ namespace fastgltf {
 		void setBufferAllocationCallback(BufferMapCallback* mapCallback, BufferUnmapCallback* unmapCallback = nullptr) noexcept;
 
 		void setExtrasParseCallback(ExtrasParseCallback* extrasCallback) noexcept;
+
+		void setExtensionsParseCallback(ExtensionsParseCallback* extensionsCallback) noexcept;
 
 		void setUserPointer(void* pointer) noexcept;
 	};

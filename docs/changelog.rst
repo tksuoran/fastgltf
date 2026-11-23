@@ -9,6 +9,7 @@ To view the full changelogs for each release please see the `GitHub releases <ht
 Unreleased
 ==========
 
+- Add: ``Parser::setExtensionsParseCallback`` and ``Exporter::setExtensionsWriteCallback`` to round-trip extensions fastgltf has no typed support for, such as vendor extensions. The parse callback receives the raw JSON of an object's ``extensions`` object, analogous to ``ExtrasParseCallback``; the write callback returns members which are spliced into the written ``extensions`` object. Both are invoked for the asset root, scenes, nodes, cameras, materials, meshes, and mesh primitives.
 - Add: Support for a subset of the glTF 2.1 proposal (`KhronosGroup/glTF#2585 <https://github.com/KhronosGroup/glTF/issues/2585>`_)
     - The top-level ``files`` array (Unified File References) is parsed into ``Asset::files``, and the ``externalAssets`` array (External Assets) into ``Asset::externalAssets``; nodes expose ``Node::externalAssetIndex``. Both arrays are also written by the exporter, and ``FileExporter`` writes loaded file entries to disk.
     - ``Options::LoadExternalFiles`` eagerly loads externally referenced files, mirroring ``Options::LoadExternalBuffers``. fastgltf never recursively parses referenced glTF assets and does not detect cross-file reference cycles; both are left to the application.
