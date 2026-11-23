@@ -482,3 +482,13 @@ TEST_CASE("Generate mesh indices", "[gltf-loader]") {
 		REQUIRE(asset.error() == fastgltf::Error::InvalidGltf);
 	}
 }
+
+TEST_CASE("Accessor type names round-trip", "[accessor]") {
+	using namespace fastgltf;
+	for (const auto type : internal::accessorTypes) {
+		REQUIRE(internal::getAccessorType(internal::getAccessorTypeName(type)) == type);
+	}
+	REQUIRE(internal::getAccessorType("VEC5") == AccessorType::Invalid);
+	REQUIRE(internal::getAccessorType("") == AccessorType::Invalid);
+	STATIC_REQUIRE(internal::getAccessorType("MAT3") == AccessorType::Mat3);
+}

@@ -458,6 +458,15 @@ namespace fastgltf {
 			return accessorTypeNames[idx - 1];
 		}
 
+		/** The reverse of getAccessorTypeName. Returns AccessorType::Invalid for unknown names. */
+		[[nodiscard]] constexpr AccessorType getAccessorType(const std::string_view name) noexcept {
+			for (std::size_t i = 0; i < accessorTypeNames.size(); ++i) {
+				if (accessorTypeNames[i] == name)
+					return accessorTypes[i];
+			}
+			return AccessorType::Invalid;
+		}
+
 		inline constexpr std::string_view mimeTypeJpeg = "image/jpeg";
 		inline constexpr std::string_view mimeTypePng = "image/png";
 		inline constexpr std::string_view mimeTypeKtx = "image/ktx2";
