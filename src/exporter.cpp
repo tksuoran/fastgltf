@@ -24,6 +24,7 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
+#include <cmath>
 #include <fstream>
 #include <ranges>
 
@@ -2227,8 +2228,12 @@ void fg::Exporter::impl::writePhysicsJoints(const Asset& asset, simdjson::builde
 
 				builder.append_comma();
 				builder.append_key_value<"axis">(drive.axis);
-				builder.append_comma();
-				builder.append_key_value<"maxForce">(drive.maxForce);
+				// An absent maxForce means the drive is not force-limited, which is clearer than
+				// writing infinity, which simdjson clamps to the largest finite double.
+				if (std::isfinite(drive.maxForce)) {
+					builder.append_comma();
+					builder.append_key_value<"maxForce">(drive.maxForce);
+				}
 				builder.append_comma();
 				builder.append_key_value<"positionTarget">(drive.positionTarget);
 				builder.append_comma();

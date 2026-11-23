@@ -1028,7 +1028,7 @@ namespace fastgltf {
 		/**
 		 * Flag to indicate that the geometry should be a convex hull.
 		 */
-		bool convexHull;
+		bool convexHull = false;
 	};
 
 	FASTGLTF_EXPORT struct PhysicsMaterial {
@@ -1038,9 +1038,9 @@ namespace fastgltf {
 
 		num restitution = 0.0f;
 
-		CombineMode frictionCombine;
+		CombineMode frictionCombine = CombineMode::Average;
 
-		CombineMode restitutionCombine;
+		CombineMode restitutionCombine = CombineMode::Average;
 	};
 
 	FASTGLTF_EXPORT struct CollisionFilter {
@@ -1150,17 +1150,17 @@ namespace fastgltf {
 		/**
 		 * The maximum force that the drive can apply
 		 */
-		num maxForce;
+		num maxForce = std::numeric_limits<num>::infinity();
 
 		/**
 		 * The desired relative target between the pivot axes
 		 */
-		num positionTarget;
+		num positionTarget = 0;
 
 		/**
 		 * The desired relative velocity of the pivot axes
 		 */
-		num velocityTarget;
+		num velocityTarget = 0;
 
 		/**
 		 * The drive's stiffness, used to achieve the position target
